@@ -10,10 +10,8 @@ export default function URLCheckerPage() {
     data?: any;
   }>({ status: 'idle' });
 
-  // 토글 상태를 관리하는 상태 변수
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
 
-  // 대시보드 데이터
   const dashboardItems = [
     { 
       title: '검사된 URL', 
@@ -57,7 +55,6 @@ export default function URLCheckerPage() {
     },
   ];
 
-  // 토글 핸들러
   const handleToggle = (index: number) => {
     setToggledItems(prev => ({
       ...prev,
@@ -73,20 +70,16 @@ export default function URLCheckerPage() {
       return;
     }
     
-    // URL 형식 검증
     try {
       new URL(url);
     } catch (e) {
       setResult({ status: 'error', message: '유효한 URL 형식이 아닙니다.' });
       return;
     }
-    
-    // 로딩 상태 설정
+
     setResult({ status: 'loading' });
-    
+
     try {
-      // 여기서는 간단한 URL 검사만 수행합니다.
-      // 실제로는 서버로 요청을 보내 URL을 분석할 수 있습니다.
       setTimeout(() => {
         setResult({ 
           status: 'success', 
@@ -166,7 +159,6 @@ export default function URLCheckerPage() {
         </div>
       </main>
 
-      {/* 대시보드 섹션 */}
       <section className="py-8 px-6 bg-gray-100">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-xl font-semibold mb-6 text-gray-700">대시보드</h2>
@@ -190,7 +182,6 @@ export default function URLCheckerPage() {
                   </div>
                 </div>
                 
-                {/* 토글된 상태에서 보여줄 상세 정보 */}
                 {toggledItems[index] && (
                   <div className="mt-2 bg-white p-4 rounded-lg shadow-md overflow-hidden transition-all">
                     <p className="text-sm text-gray-600 mb-2">{item.description}</p>
@@ -226,7 +217,7 @@ export default function URLCheckerPage() {
 
 // 색상을 가져오는 함수
 function getBorderColor(color: string): string {
-  switch(color) {
+  switch (color) {
     case 'blue': return '#3b82f6';
     case 'green': return '#10b981';
     case 'yellow': return '#f59e0b';
