@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 export default function URLCheckerPage() {
   const [url, setUrl] = useState('');
@@ -11,6 +11,7 @@ export default function URLCheckerPage() {
   }>({ status: 'idle' });
 
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
+  const exampleRef = useRef<HTMLDivElement | null>(null); // 예제 연습 섹션 참조
 
   const dashboardItems = [
     {
@@ -79,7 +80,6 @@ export default function URLCheckerPage() {
 
     setResult({ status: 'loading' });
 
-    try {
       setTimeout(() => {
         setResult({ 
           status: 'success', 
@@ -92,11 +92,11 @@ export default function URLCheckerPage() {
           }
         });
       }, 1500);
-    } catch (error) {
-      setResult({ 
-        status: 'error', 
-        message: '검사 중 오류가 발생했습니다.'
-      });
+  };
+
+  const scrollToExample = () => {
+    if (exampleRef.current) {
+      exampleRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -137,13 +137,11 @@ export default function URLCheckerPage() {
                 {result.message}
               </div>
             )}
-
             {result.status === 'loading' && (
               <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md">
                 URL을 검사하고 있습니다...
               </div>
             )}
-
             {result.status === 'success' && result.data && (
               <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-md">
                 <h3 className="font-medium mb-2">{result.message}</h3>
@@ -159,13 +157,14 @@ export default function URLCheckerPage() {
         </div>
       </main>
 
+      {/* 대시보드 */}
       <section className="py-8 px-6 bg-gray-100">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-xl font-semibold mb-6 text-gray-700">대시보드</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {dashboardItems.map((item, index) => (
               <div key={index} className="flex flex-col">
-                <div 
+                <div
                   className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer"
                   style={{ borderTop: `4px solid ${getBorderColor(item.color)}` }}
                   onClick={() => handleToggle(index)}
@@ -181,13 +180,13 @@ export default function URLCheckerPage() {
                     클릭하여 {toggledItems[index] ? '숨기기' : '자세히 보기'}
                   </div>
                 </div>
-                
+
                 {toggledItems[index] && (
                   <div className="mt-2 bg-white p-4 rounded-lg shadow-md overflow-hidden transition-all">
                     <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                    <img 
-                      src={item.image} 
-                      alt={`${item.title} 그래프`} 
+                    <img
+                      src={item.image}
+                      alt={`${item.title} 그래프`}
                       className="w-full h-auto rounded-md"
                     />
                   </div>
@@ -195,15 +194,33 @@ export default function URLCheckerPage() {
               </div>
             ))}
           </div>
+
+          {/* 스크롤 버튼 */}
+          <div className="mt-10 text-center">
+            <button
+              onClick={scrollToExample}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-md transition"
+            >
+              예제 연습 페이지로 이동 ↓
+            </button>
+          </div>
         </div>
       </section>
 
-      
+      {/* 예제 연습 페이지 섹션 */}
+      <section ref={exampleRef} className="py-20 bg-white px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl font-bold mb-4">🧪 예제 연습 페이지</h2>
+          <p className="text-gray-600 mb-6">이 섹션에서는 다양한 예제를 통해 URL 분석 로직을 실습해볼 수 있습니다.</p>
+          <div className="bg-gray-100 p-6 rounded-lg shadow-inner">
+            <p className="text-gray-800">여기에 예제 코드, 실습 가이드 또는 컴포넌트를 추가하세요.</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-// 색상을 가져오는 함수
 function getBorderColor(color: string): string {
   switch (color) {
     case 'blue': return '#3b82f6';
