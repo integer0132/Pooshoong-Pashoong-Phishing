@@ -13,46 +13,46 @@ export default function URLCheckerPage() {
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
 
   const dashboardItems = [
-    { 
-      title: '검사된 URL', 
-      value: '1,234', 
-      icon: '🔗', 
+    {
+      title: '자바스크립트 분석',
+      value: '152건',
+      icon: '📄',
       color: 'blue',
-      image: 'https://placehold.co/600x400/3b82f6/white?text=URL+통계',
-      description: '지금까지 검사된 URL의 총 개수입니다.'
+      image: 'https://placehold.co/600x400/3b82f6/white?text=자바스크립트+분석',
+      description: '의심스러운 자바스크립트 코드를 정적 분석하여 악성 스크립트를 탐지합니다.',
     },
-    { 
-      title: '안전한 URL', 
-      value: '1,021', 
-      icon: '✅', 
+    {
+      title: 'URL 분석',
+      value: '327건',
+      icon: '🔍',
       color: 'green',
-      image: 'https://placehold.co/600x400/10b981/white?text=안전한+URL+통계',
-      description: '안전하다고 확인된 URL의 개수입니다.'
+      image: 'https://placehold.co/600x400/10b981/white?text=URL+분석',
+      description: '입력된 URL의 구조와 리디렉션 등을 분석하여 위험 여부를 판별합니다.',
     },
-    { 
-      title: '의심스러운 URL', 
-      value: '189', 
-      icon: '⚠️', 
-      color: 'yellow',
-      image: 'https://placehold.co/600x400/f59e0b/white?text=의심스러운+URL+통계',
-      description: '잠재적으로 위험한 요소가 있는 URL의 개수입니다.'
-    },
-    { 
-      title: '유해한 URL', 
-      value: '24', 
-      icon: '❌', 
+    {
+      title: '블랙리스트 분석',
+      value: '89건',
+      icon: '🚫',
       color: 'red',
-      image: 'https://placehold.co/600x400/ef4444/white?text=유해한+URL+통계',
-      description: '악성코드나 피싱으로 확인된 URL의 개수입니다.'
+      image: 'https://placehold.co/600x400/ef4444/white?text=블랙리스트+분석',
+      description: '국내외 보안 기관의 블랙리스트와 대조하여 악성 URL 여부를 확인합니다.',
     },
-    { 
-      title: '오늘 검사 횟수', 
-      value: '87', 
-      icon: '📊', 
+    {
+      title: '동적 실행 분석',
+      value: '64건',
+      icon: '⚙️',
       color: 'purple',
-      image: 'https://placehold.co/600x400/8b5cf6/white?text=오늘의+검사+현황',
-      description: '오늘 이 서비스를 통해 검사된 URL의 횟수입니다.'
+      image: 'https://placehold.co/600x400/8b5cf6/white?text=동적+실행+분석',
+      description: 'URL에 포함된 리소스를 실제로 실행해 보고 이상 행위를 감지합니다.',
     },
+    {
+      title: 'WASM 분석',
+      value: '18건',
+      icon: '🧬',
+      color: 'yellow',
+      image: 'https://placehold.co/600x400/facc15/black?text=WASM+분석',
+      description: 'WebAssembly 파일을 분석하여 브라우저에서 실행될 수 있는 위험 요소를 확인합니다.',
+    }
   ];
 
   const handleToggle = (index: number) => {
