@@ -2,7 +2,7 @@ from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import JSONResponse
 import asyncio
 import requests
-from bs4 import BeautifulSoup
+import logging
 from playwright.sync_api import sync_playwright
 
 from detection import (
@@ -13,6 +13,13 @@ from detection import (
     dom_analyzer,
     rule_engine
 )
+
+# === 로깅 설정 ===
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -55,7 +62,7 @@ async def detect(url: str = Form(...)):
                 page.goto(final_url, timeout=15000)
                 page.wait_for_timeout(5000)
             except Exception as e:
-                print(f"[!] 페이지 로딩 실패: {e}")
+                logger.warning(f"[!] 페이지 로딩 실패: {e}")
 
             browser.close()
 
@@ -67,7 +74,7 @@ async def detect(url: str = Form(...)):
                 resp.raise_for_status()
                 js_codes.append(resp.text)
             except Exception as e:
-                print(f"[✗] JS 로딩 실패: {js_url} - {e}")
+                logger.warning(f"[✗] JS 로딩 실패: {js_url} - {e}")
 
         for wasm_url in resource_urls["wasm"]:
             try:
@@ -75,7 +82,7 @@ async def detect(url: str = Form(...)):
                 resp.raise_for_status()
                 wasm_files.append(resp.content)
             except Exception as e:
-                print(f"[✗] WASM 로딩 실패: {wasm_url} - {e}")
+                logger.warning(f"[✗] WASM 로딩 실패: {wasm_url} - {e}")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: {str(e)}")
