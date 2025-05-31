@@ -2,7 +2,15 @@ import os
 import requests
 import threading
 import time
+import logging
 from datetime import datetime
+
+# === 로깅 설정 ===
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # === 환경 변수로 설정된 GSB API 키 사용 ===
 GOOGLE_API_KEY = os.getenv("GSB_API_KEY")
@@ -31,7 +39,7 @@ def check_gsb(url: str) -> bool:
             data = response.json()
             return bool(data.get("matches"))
     except Exception as e:
-        print(f"[GSB] 검사 실패: {e}")
+        logger.warning(f"[GSB] 검사 실패: {e}")
     
     return False
 
@@ -46,7 +54,7 @@ def load_phishtank():
             with blacklist_lock:
                 phishtank_data = {entry["url"].strip().lower().rstrip("/") for entry in entries}
     except Exception as e:
-        print(f"[PhishTank] 로딩 실패: {e}")
+        logger.warning(f"[PhishTank] 로딩 실패: {e}")
 
 
 def is_phishtank_url(url: str) -> bool:
@@ -64,7 +72,7 @@ def load_openphish():
             with blacklist_lock:
                 openphish_data = {line.strip().lower().rstrip("/") for line in lines if line.strip()}
     except Exception as e:
-        print(f"[OpenPhish] 로딩 실패: {e}")
+        logger.warning(f"[OpenPhish] 로딩 실패: {e}")
 
 
 def is_openphish_url(url: str) -> bool:
