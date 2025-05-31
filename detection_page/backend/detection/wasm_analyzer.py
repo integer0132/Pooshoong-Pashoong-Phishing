@@ -89,7 +89,7 @@ def analyze_single_wasm(wasm_bytes: bytes, page_domain: str = None) -> dict:
                             reasons.append(f"WASM 내 의심 URL 감지: {url}")
                             break
                     if is_domain_recent(domain):
-                        reasons.append(f"의심 URL 도메인 최근 생성됨 (WHOIS)")
+                        reasons.append(f"의심 URL 도메인 최근 생성됨 (WHOIS): {url}")
 
         if reasons:
             return {"result": "의심", "reason": reasons}
