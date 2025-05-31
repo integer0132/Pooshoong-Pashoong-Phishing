@@ -3,6 +3,7 @@ import tempfile
 import os
 import re
 import whois
+import tldextract
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from typing import List, Union
@@ -11,27 +12,28 @@ from typing import List, Union
 SUSPICIOUS_KEYWORDS = [
     "password", "login", "credentials", "postMessage",
     "fetch", "XMLHttpRequest", "sendBeacon", "WebSocket",
-    "document.cookie", "eval"
+    "document.cookie", "eval", "syscall/js.ValueOf", "js.Global().Call", "js.Global().Get",
+    "js.Global().New", "js.Global().Set", "js_sys::Reflect", "js_sys::Function", "js_sys::Promise",
+    "wasm_bindgen::JsValue", "wasm_bindgen::closure",
+    "web_sys::window", "web_sys::Document", "web_sys::Navigator", "web_sys::Fetch",
 ]
 
 # === 난독화 또는 인코딩 패턴 ===
 SUSPICIOUS_ENCODING_PATTERNS = [
-    r"base64[^\\s]{0,10}decode",   # base64Decode, base64_decode
-    r"atob\(",                     # JS base64 decoding
-    r"[A-Za-z0-9+/=]{30,}",         # 긴 base64 문자열
-    r"fromCharCode",
-    r"charCodeAt",
-    r"btoa"
+    (r"base64[^\\s]{0,10}decode", "base64 디코딩 함수"),   # base64Decode, base64_decode
+    (r"atob\(", "base64 디코딩 함수"),                    # JS base64 decoding
+    (r"fromCharCode", "문자 코드 기반 디코딩"),
+    (r"charCodeAt", "문자 코드 기반 인코딩"),
+    (r"btoa", "base64 인코딩 함수")
 ]
 
 # === URL 패턴 정규표현식 ===
 URL_PATTERN = r"https?://[^\s\"\'\)\(]+"  # 공백/따옴표 등으로 끝나는 모든 URL
 
-# === 의심 URL 패턴 ===
-SUSPICIOUS_URL_PATTERNS = [
-    r"https?://(?:\d{1,3}\.){3}\d{1,3}(:[0-9]+)?(/[^\s]*)?",
-    r"https?://[a-zA-Z0-9\-\.]+\.(?!com|net|org|co.kr|ac.kr|or.kr|go.kr|edu|gov|jp|de)([a-z]{2,})(:[0-9]+)?(/[^\s]*)?",  # 의심 TLD
-]
+SAFE_TLDS = {
+    "com", "net", "org", "co.kr", "ac.kr", "or.kr",
+    "go.kr", "edu", "gov", "jp", "de", "kr"
+}
 
 # === WHOIS 검사 ===
 def is_domain_recent(domain: str) -> bool:
@@ -68,9 +70,9 @@ def analyze_single_wasm(wasm_bytes: bytes, page_domain: str = None) -> dict:
             reasons.append(f"WASM 내 의심 키워드 포함: {', '.join(found_keywords)}")
 
         # 인코딩/난독화 탐지
-        for pattern in SUSPICIOUS_ENCODING_PATTERNS:
+        for pattern, description in SUSPICIOUS_ENCODING_PATTERNS:
             if re.search(pattern, wat_text):
-                reasons.append(f"WASM 내 인코딩/난독화 패턴 감지 (패턴: {pattern})")
+                reasons.append(f"WASM 내 인코딩/난독화 패턴 감지 (패턴: {description})")
                 break
 
         # 3. URL 추출 후 도메인 비교 및 WHOIS
@@ -82,12 +84,18 @@ def analyze_single_wasm(wasm_bytes: bytes, page_domain: str = None) -> dict:
             if domain:
                 domain = domain.lower()
                 if page_domain and domain != page_domain.lower():
-                    reasons.append(f"WASM 내 외부 서버 전송 URL 감지: {url}")
-                    # 의심 URL 패턴과 비교
-                    for pattern in SUSPICIOUS_URL_PATTERNS:
-                        if re.match(pattern, url, re.IGNORECASE):
-                            reasons.append(f"WASM 내 의심 URL 감지: {url}")
-                            break
+                    reasons.append(f"WASM 내 외부 서버 URL 감지: {url}")
+
+                    # IP 주소 또는 localhost
+                    if re.match(r"(?:\d{1,3}\.){3}\d{1,3}", domain) or domain == "localhost":
+                        reasons.append(f"WASM 내 의심 URL 감지 (IP/로컬): {url}")
+                    # 비표준 TLD
+                    else:
+                        ext = tldextract.extract(domain)
+                        tld = ext.suffix
+                        if tld not in SAFE_TLDS:
+                            reasons.append(f"WASM 내 의심 URL 감지 (비표준 TLD): {url}")
+
                     if is_domain_recent(domain):
                         reasons.append(f"의심 URL 도메인 최근 생성됨 (WHOIS): {url}")
 
