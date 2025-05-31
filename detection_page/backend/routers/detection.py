@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 import requests
 import logging
+from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 
 from detection import (
@@ -28,9 +29,12 @@ async def detect(url: str = Form(...)):
     if not url.strip():
         raise HTTPException(status_code=400, detail="URL은 필수입니다.")
 
+    # 1. URL 분석
     url_result = await asyncio.to_thread(url_analyzer.analyze_url, url)
     final_url = url_result.get("final_url", url)
+    page_domain = urlparse(final_url).hostname or ""
 
+    # 2. HTML 코드 로딩
     try:
         resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
@@ -38,6 +42,7 @@ async def detect(url: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"HTML 로딩 실패: {str(e)}")
 
+    # 3. JS/WASM 수집
     js_codes = []
     wasm_files = []
 
@@ -87,6 +92,7 @@ async def detect(url: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: {str(e)}")
 
+    # 4. 병렬 분석 태스크
     html_js_task = asyncio.to_thread(
         html_js_analyzer.analyze_html_js, html_code, js_codes
     ) if js_codes else asyncio.to_thread(lambda: {
@@ -97,7 +103,7 @@ async def detect(url: str = Form(...)):
     dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, html_code)
 
     wasm_task = asyncio.to_thread(
-        wasm_analyzer.analyze_wasm, wasm_files
+        wasm_analyzer.analyze_wasm, wasm_files, page_domain
     ) if wasm_files else asyncio.to_thread(lambda: {
         "result": "정상",
         "reason": ["WASM 파일 없음"]
@@ -105,6 +111,7 @@ async def detect(url: str = Form(...)):
 
     blacklist_task = asyncio.to_thread(blacklist_analyzer.analyze_blacklist, final_url)
 
+    # 5. 실행 및 결과 통합
     html_js_result, dom_result, wasm_result, blacklist_result = await asyncio.gather(
         html_js_task, dom_task, wasm_task, blacklist_task
     )
