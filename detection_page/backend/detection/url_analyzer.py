@@ -1,113 +1,154 @@
-from fastapi import APIRouter, Form, HTTPException
-from fastapi.responses import JSONResponse
-import asyncio
+import re
+import ssl
+import json
+import socket
+import tldextract
 import requests
-from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from difflib import SequenceMatcher
+from Levenshtein import distance as levenshtein_distance
+from jellyfish import jaro_winkler_similarity
+import whois
+from typing import Union
 
-from detection import (
-    html_js_analyzer,
-    url_analyzer,
-    blacklist_analyzer,
-    wasm_analyzer,
-    dom_analyzer,
-    rule_engine
-)
+# === JSON 파일 경로 ===
+LEGIT_DOMAIN_PATH = "detection/resources/domain.json"
+SHORTEN_DOMAIN_PATH = "detection/resources/url_shortening.json"
 
-router = APIRouter()
+# === JSON 데이터 로딩 ===
+with open(LEGIT_DOMAIN_PATH, encoding='utf-8') as f:
+    LEGIT_DOMAINS = json.load(f)
 
-@router.post("/detect")
-async def detect(url: str = Form(...)):
-    if not url.strip():
-        raise HTTPException(status_code=400, detail="URL은 필수입니다.")
+with open(SHORTEN_DOMAIN_PATH, encoding='utf-8') as f:
+    SHORTENED_DOMAINS = set(json.load(f))
 
-    url_result = await asyncio.to_thread(url_analyzer.analyze_url, url)
-    final_url = url_result.get("final_url", url)
+# === 피싱 키워드 목록 ===
+PHISHING_KEYWORDS = [
+    "login", "secure", "signin", "banking", "update", "verify",
+    "account", "webscr", "ebayisapi", "paypal", "password"
+]
 
+# === 도메인 추출 ===
+def extract_domain(url: str) -> str:
     try:
-        resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        html_code = resp.text
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"HTML 로딩 실패: {str(e)}")
+        extracted = tldextract.extract(url)
+        return f"{extracted.domain}.{extracted.suffix}".lower()
+    except Exception:
+        return url
 
-    js_codes = []
-    wasm_files = []
-
+# === 단축 URL 여부 판별 ===
+def is_shortened_url(url: str) -> bool:
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context()
-            page = context.new_page()
+        domain = extract_domain(url)
+        return domain in SHORTENED_DOMAINS
+    except Exception:
+        return False
 
-            resource_urls = {"js": set(), "wasm": set()}
+# === 단축 URL 리디렉션 ===
+def resolve_short_url(url: str) -> str:
+    try:
+        session = requests.Session()
+        session.headers.update({'User-Agent': 'Mozilla/5.0'})
+        response = session.head(url, allow_redirects=True, timeout=5)
+        return response.url
+    except Exception as e2:
+        return url
 
-            def on_request(request):
-                req_url = request.url
-                if req_url.endswith(".js"):
-                    resource_urls["js"].add(req_url)
-                elif req_url.endswith(".wasm"):
-                    resource_urls["wasm"].add(req_url)
+# === 피싱 키워드 탐지 ===
+def detect_phishing_keywords(url: str) -> list:
+    lowered = url.lower()
+    return [kw for kw in PHISHING_KEYWORDS if kw in lowered]
 
-            page.on("request", on_request)
+# === 유사 도메인 탐지 ===
+def detect_similar_domain(domain: str) -> Union[str, None]:
+    domain = domain.lower()
 
-            try:
-                page.goto(final_url, timeout=15000)
-                page.wait_for_timeout(5000)
-            except Exception as e:
-                print(f"[!] 페이지 로딩 실패: {e}")
+    if domain in [d.lower() for d in LEGIT_DOMAINS]:
+        return None
 
-            browser.close()
+    for legit in LEGIT_DOMAINS:
+        legit = legit.lower()
+        seq_ratio = SequenceMatcher(None, domain, legit).ratio()
+        lev_dist = levenshtein_distance(domain, legit)
+        jaro_score = jaro_winkler_similarity(domain, legit)
+        if seq_ratio > 0.75 or lev_dist <= 2 or jaro_score > 0.90:
+            return legit
+    return None
 
-        headers = {"User-Agent": "Mozilla/5.0"}
+# === WHOIS 도메인 등록일 확인 ===
+def check_whois_age(domain: str) -> Union[str, None]:
+    try:
+        w = whois.whois(domain)
+        creation = w.creation_date[0] if isinstance(w.creation_date, list) else w.creation_date
+        if creation and (datetime.now() - creation < timedelta(days=30)):
+            return creation.date().isoformat()
+    except:
+        return "fail"
+    return None
 
-        for js_url in resource_urls["js"]:
-            try:
-                resp = requests.get(js_url, headers=headers, timeout=5)
-                resp.raise_for_status()
-                js_codes.append(resp.text)
-            except Exception as e:
-                print(f"[✗] JS 로딩 실패: {js_url} - {e}")
+# === SSL 인증서 확인 ===
+def check_ssl_certificate(domain: str) -> bool:
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((domain, 443), timeout=3) as sock:
+            with context.wrap_socket(sock, server_hostname=domain) as ssock:
+                return bool(ssock.getpeercert())
+    except:
+        return False
 
-        for wasm_url in resource_urls["wasm"]:
-            try:
-                resp = requests.get(wasm_url, headers=headers, timeout=5)
-                resp.raise_for_status()
-                wasm_files.append(resp.content)
-            except Exception as e:
-                print(f"[✗] WASM 로딩 실패: {wasm_url} - {e}")
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: {str(e)}")
-
-    html_js_task = asyncio.to_thread(
-        html_js_analyzer.analyze_html_js, html_code, js_codes
-    ) if js_codes else asyncio.to_thread(lambda: {
+# === URL 분석 ===
+def analyze_url(url: str) -> dict:
+    result = {
+        "original_url": url,
+        "final_url": url,
         "result": "정상",
-        "reason": ["JS 파일 없음"]
-    })
+        "reason": []
+    }
 
-    dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, html_code)
+    # 1. 단축 URL 처리
+    if is_shortened_url(url):
+        resolved_url = resolve_short_url(url)
+        result["final_url"] = resolved_url
+    else:
+        resolved_url = url
 
-    wasm_task = asyncio.to_thread(
-        wasm_analyzer.analyze_wasm, wasm_files
-    ) if wasm_files else asyncio.to_thread(lambda: {
-        "result": "정상",
-        "reason": ["WASM 파일 없음"]
-    })
+    # 2. 분석 대상 도메인 추출
+    domain = extract_domain(resolved_url)
+    parsed_scheme = urlparse(resolved_url).scheme
 
-    blacklist_task = asyncio.to_thread(blacklist_analyzer.analyze_blacklist, final_url)
+    # 3. 키워드 탐지
+    keywords_found = []
+    if domain not in LEGIT_DOMAINS:
+        keywords_found = detect_phishing_keywords(resolved_url)
+        if keywords_found:
+            result["reason"].append(f"피싱 키워드 포함: {', '.join(keywords_found)}")
 
-    html_js_result, dom_result, wasm_result, blacklist_result = await asyncio.gather(
-        html_js_task, dom_task, wasm_task, blacklist_task
-    )
+    # 4. 유사 도메인 탐지
+    similar = detect_similar_domain(domain)
+    if similar:
+        result["reason"].append(f"공식 도메인 '{similar}'과 유사한 도메인 사용")
 
-    final_result = rule_engine.aggregate_results({
-        "url": url_result,
-        "html_js": html_js_result,
-        "dom": dom_result,
-        "wasm": wasm_result,
-        "blacklist": blacklist_result
-    })
+    # 5. WHOIS 등록일
+    age_info = check_whois_age(domain)
+    if age_info == "fail":
+        result["reason"].append("WHOIS 정보 확인 실패")
+    elif age_info:
+        result["reason"].append(f"최근 생성된 도메인 (등록일: {age_info})")
 
-    return JSONResponse(content=final_result)
+    # 6. SSL 인증서 확인
+    if parsed_scheme == "http":
+        result["reason"].append("SSL 인증서 없음 (비보안 HTTP 사용)")
+    elif not check_ssl_certificate(domain):
+        result["reason"].append("SSL 인증서 없음 또는 연결 실패")
+
+    # 7. 최종 결과 판정
+    if any(keyword in r for r in result["reason"] for keyword in ["유사", "실패", "없음", "등록일"]):
+        result["result"] = "의심"
+    else:
+        result["result"] = "정상"
+        if not result["reason"]:
+            result["reason"].append("URL 분석상 문제 없음")
+
+
+    return result
