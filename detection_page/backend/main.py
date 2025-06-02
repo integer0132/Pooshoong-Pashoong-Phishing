@@ -8,7 +8,7 @@ import uvicorn
 # Load environment variables from .env file
 load_dotenv()
 
-# 🔹 블랙리스트 자동 업데이트 시작
+# 블랙리스트 자동 업데이트 시작
 from detection import blacklist_module
 blacklist_module.start_blacklist_updater()
 
