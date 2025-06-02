@@ -5,6 +5,8 @@ import requests
 import logging
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
+from uuid import uuid4
+from datetime import datetime, timedelta
 
 from detection import (
     html_js_analyzer,
@@ -15,26 +17,45 @@ from detection import (
     rule_engine
 )
 
-# === 로깅 설정 ===
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# === 캐시: task_id => 분석 결과 ===
+task_cache = {}
+CACHE_TTL_SECONDS = 300  # 5분
 
+def save_task_result(task_id, result):
+    task_cache[task_id] = {
+        "timestamp": datetime.utcnow(),
+        "result": result
+    }
+
+def get_task_result(task_id):
+    task = task_cache.get(task_id)
+    if not task:
+        return None
+    if datetime.utcnow() - task["timestamp"] > timedelta(seconds=CACHE_TTL_SECONDS):
+        del task_cache[task_id]
+        return None
+    return task["result"]
+
+def cleanup_expired_tasks():
+    now = datetime.utcnow()
+    expired = [k for k, v in task_cache.items() if now - v["timestamp"] > timedelta(seconds=CACHE_TTL_SECONDS)]
+    for k in expired:
+        del task_cache[k]
+
+# === /detect ===
 @router.post("/detect")
 async def detect(url: str = Form(...)):
+    cleanup_expired_tasks()
     if not url.strip():
         raise HTTPException(status_code=400, detail="URL은 필수입니다.")
 
-    # 1. URL 분석
     url_result = await asyncio.to_thread(url_analyzer.analyze_url, url)
     final_url = url_result.get("final_url", url)
     page_domain = urlparse(final_url).hostname or ""
 
-    # 2. HTML 코드 로딩
     try:
         resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
@@ -42,10 +63,7 @@ async def detect(url: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"HTML 로딩 실패: {str(e)}")
 
-    # 3. JS/WASM 수집
-    js_codes = []
-    wasm_files = []
-
+    js_codes, wasm_files = [], []
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -55,12 +73,9 @@ async def detect(url: str = Form(...)):
             resource_urls = {"js": set(), "wasm": set()}
 
             def on_request(request):
-                req_url = request.url
-                if req_url.endswith(".js"):
-                    resource_urls["js"].add(req_url)
-                elif req_url.endswith(".wasm"):
-                    resource_urls["wasm"].add(req_url)
-
+                u = request.url
+                if u.endswith(".js"): resource_urls["js"].add(u)
+                elif u.endswith(".wasm"): resource_urls["wasm"].add(u)
             page.on("request", on_request)
 
             try:
@@ -72,50 +87,30 @@ async def detect(url: str = Form(...)):
             browser.close()
 
         headers = {"User-Agent": "Mozilla/5.0"}
-
         for js_url in resource_urls["js"]:
             try:
                 resp = requests.get(js_url, headers=headers, timeout=5)
-                resp.raise_for_status()
                 js_codes.append(resp.text)
-            except Exception as e:
-                logger.warning(f"[✗] JS 로딩 실패: {js_url} - {e}")
-
+            except Exception: pass
         for wasm_url in resource_urls["wasm"]:
             try:
                 resp = requests.get(wasm_url, headers=headers, timeout=5)
-                resp.raise_for_status()
                 wasm_files.append(resp.content)
-            except Exception as e:
-                logger.warning(f"[✗] WASM 로딩 실패: {wasm_url} - {e}")
+            except Exception: pass
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: {str(e)}")
 
-    # 4. 병렬 분석 태스크
-    html_js_task = asyncio.to_thread(
-        html_js_analyzer.analyze_html_js, html_code, js_codes
-    ) if js_codes else asyncio.to_thread(lambda: {
-        "result": "정상",
-        "reason": ["JS 파일 없음"]
-    })
-
-    dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, html_code)
-
-    wasm_task = asyncio.to_thread(
-        wasm_analyzer.analyze_wasm, wasm_files, page_domain
-    ) if wasm_files else asyncio.to_thread(lambda: {
-        "result": "정상",
-        "reason": ["WASM 파일 없음"]
-    })
-
+    html_js_task = asyncio.to_thread(html_js_analyzer.analyze_html_js, html_code, js_codes) if js_codes else asyncio.to_thread(lambda: {"result": "정상", "reason": ["JS 파일 없음"]})
+    dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, final_url)
+    wasm_task = asyncio.to_thread(wasm_analyzer.analyze_wasm, wasm_files, page_domain) if wasm_files else asyncio.to_thread(lambda: {"result": "정상", "reason": ["WASM 파일 없음"]})
     blacklist_task = asyncio.to_thread(blacklist_analyzer.analyze_blacklist, final_url)
 
-    # 5. 실행 및 결과 통합
     html_js_result, dom_result, wasm_result, blacklist_result = await asyncio.gather(
         html_js_task, dom_task, wasm_task, blacklist_task
     )
 
+    task_id = str(uuid4())
     final_result = rule_engine.aggregate_results({
         "url": url_result,
         "html_js": html_js_result,
@@ -124,4 +119,14 @@ async def detect(url: str = Form(...)):
         "blacklist": blacklist_result
     })
 
-    return JSONResponse(content=final_result)
+    save_task_result(task_id, final_result)
+    return JSONResponse(content={"task_id": task_id, "result": final_result})
+
+# === /detect/result/{task_id} ===
+@router.get("/detect/result/{task_id}")
+def detect_result(task_id: str):
+    cleanup_expired_tasks()
+    result = get_task_result(task_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="분석 결과 없음 또는 만료됨")
+    return JSONResponse(content=result)
