@@ -66,7 +66,7 @@ def is_phishtank_url(url: str) -> bool:
 def load_openphish():
     global openphish_data
     try:
-        response = requests.get("https://openphish/feed.txt", timeout=10)
+        response = requests.get("https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt", timeout=10)
         if response.status_code == 200:
             lines = response.text.strip().splitlines()
             with blacklist_lock:
