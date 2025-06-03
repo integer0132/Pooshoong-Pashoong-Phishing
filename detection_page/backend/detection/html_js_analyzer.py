@@ -57,7 +57,7 @@ def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
     reasons = []
 
     # === HTML 분석
-    for pattern in TRANSMISSION_API_PATTERNS:
+    for pattern in TRANSMISSION_PATTERNS:
         if re.search(pattern, html_code, flags=re.MULTILINE | re.DOTALL):
             if (url_match := re.search(URL_PATTERN, html_code)):
                 url = url_match.group(0)
@@ -70,7 +70,7 @@ def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
 
     # === JS 분석
     for js in js_codes:
-        for pattern in TRANSMISSION_API_PATTERNS:
+        for pattern in TRANSMISSION_PATTERNS:
             if re.search(pattern, js, flags=re.MULTILINE | re.DOTALL):
                 if (url_match := re.search(URL_PATTERN, js)):
                     url = url_match.group(0)
