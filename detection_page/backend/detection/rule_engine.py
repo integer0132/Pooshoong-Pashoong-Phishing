@@ -34,8 +34,8 @@ def aggregate_results(results: dict) -> dict:
     if final_result == "악성":
         message = "이미 보고된 피싱 사이트입니다."
     elif final_result == "의심":
-        unique_points = list({r.split("→")[0].strip() for r in collected_reasons})
-        message = f"{len(collected_reasons)}개의 의심 활동이 감지되었습니다: " + ", ".join(unique_points)
+        unique_points = "\n".join(f"\t- {r}" for r in collected_reasons)
+        message = f"{len(collected_reasons)}개의 의심 활동이 감지되었습니다.\n{unique_points}"
     else:
         message = "Credential Harvesting 활동이 감지되지 않았습니다."
 
