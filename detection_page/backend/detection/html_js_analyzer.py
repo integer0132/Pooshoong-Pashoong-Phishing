@@ -1,1 +1,110 @@
+import re
+import whois
+from datetime import datetime
+from typing import List, Dict
+from urllib.parse import urlparse
 
+# === 민감 키워드
+CREDENTIAL_KEYWORDS = [
+    "password", "passwd", "pwd", "credential", "login", "username", "user", "token", "auth"
+]
+
+# === 외부 URL 정규표현식
+URL_PATTERN = r"https?://(?:localhost|\d{1,3}(?:\.\d{1,3}){3}|(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,})(?::\d+)?(?:/[^\s\"\'\)\(\[\]<>{}\\]*)?"
+
+# === 전송 API 호출 패턴
+TRANSMISSION_API_PATTERNS = [
+    r"\bfetch\s*\(\s*['\"]?\s*https?://",
+    r"navigator\.sendBeacon\s*\(\s*['\"]?\s*https?://",
+    r"\.open\s*\(\s*['\"](?:GET|POST|PUT|DELETE)['\"]\s*,\s*['\"]\s*https?://",
+    r"\.send\s*\(\s*['\"].*(password|token|user|login).*['\"]",
+    r"new\s+WebSocket\s*\(\s*['\"]\s*wss?://",
+    r"\baxios\.(get|post|put|delete)\s*\(\s*['\"]\s*https?://",
+    r"\$\.ajax\s*\(\s*\{\s*url\s*:\s*['\"]\s*https?://",
+    r"\.src\s*=\s*['\"]\s*https?://",
+    r"\.submit\s*\(",
+    r'Call\s*\(\s*["\']fetch["\']',
+    r'Reflect::get\s*\(\s*window\s*,\s*["\']fetch["\']'
+]
+
+# === 전송 API 키워드 (eval 감지용)
+TRANSMISSION_API_KEYWORDS = [
+    "fetch",
+    "XMLHttpRequest",
+    "axios",
+    "sendBeacon",
+    "WebSocket",
+    r"\$\.ajax",
+    r"\.submit",
+    r"\.src",
+    r"Call\s*\(\s*['\"]fetch",
+    r"Reflect::get\s*\(\s*window\s*,\s*['\"]fetch"
+]
+
+# === eval, Function, setTimeout 내부 호출 감지
+EVAL_EXECUTION_PATTERNS = [
+    fr"{wrapper}\s*\(\s*['\"].*{api}.*" for wrapper in ["eval", "Function", "setTimeout"]
+                                       for api in TRANSMISSION_API_KEYWORDS
+]
+
+# === 도메인 추출
+def extract_domain(url: str) -> str:
+    try:
+        return urlparse(url).netloc.lower()
+    except:
+        return ""
+
+# === 최근 생성 도메인 여부
+def is_domain_recent(domain: str, days_threshold=30) -> bool:
+    try:
+        w = whois.whois(domain)
+        created = w.creation_date
+        if isinstance(created, list):
+            created = created[0]
+        return created and (datetime.now() - created).days <= days_threshold
+    except:
+        return True  # 조회 실패도 위험 처리
+
+# === 민감 키워드 포함 여부 및 목록 반환
+def find_credential_keywords(text: str) -> List[str]:
+    return [kw for kw in CREDENTIAL_KEYWORDS if re.search(rf"\b{re.escape(kw)}\b", text)]
+
+# === 메인 분석 함수
+def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
+    reasons = []
+
+    # === HTML 분석
+    for pattern in TRANSMISSION_API_PATTERNS:
+        if re.search(pattern, html_code, flags=re.MULTILINE | re.DOTALL):
+            if (url_match := re.search(URL_PATTERN, html_code)):
+                url = url_match.group(0)
+                domain = extract_domain(url)
+                if is_domain_recent(domain):
+                    reasons.append(f"[HTML] 외부 URL 전송 (신규 도메인) → `{domain}`")
+
+            keywords = find_credential_keywords(html_code)
+            if keywords:
+                reasons.append(f"[HTML] 민감 키워드 포함 ({', '.join(keywords)})")
+
+    # === JS 분석
+    for js in js_codes:
+        for pattern in TRANSMISSION_API_PATTERNS:
+            if re.search(pattern, js, flags=re.MULTILINE | re.DOTALL):
+                if (url_match := re.search(URL_PATTERN, js)):
+                    url = url_match.group(0)
+                    domain = extract_domain(url)
+                    if is_domain_recent(domain):
+                        reasons.append(f"[JS] 외부 URL 전송 (신규 도메인) → `{domain}`")
+
+                keywords = find_credential_keywords(js)
+                if keywords:
+                    reasons.append(f"[JS] 민감 키워드 포함 ({', '.join(keywords)})")
+
+        for pattern in EVAL_EXECUTION_PATTERNS:
+            if re.search(pattern, js, flags=re.MULTILINE | re.DOTALL):
+                reasons.append(f"[JS] 동적 실행 내 전송 API 문자열 감지 → `{pattern}`")
+
+    return {
+        "result": "의심" if reasons else "정상",
+        "reason": reasons if reasons else ["HTML/JS 내 Credential Harvesting 징후 없음"]
+    }
