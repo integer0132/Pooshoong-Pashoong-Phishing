@@ -9,7 +9,7 @@ import uvicorn
 load_dotenv()
 
 # 블랙리스트 자동 업데이트 시작
-from detection import blacklist_module
+from detection import blacklist_analyzer
 blacklist_module.start_blacklist_updater()
 
 app = FastAPI(
