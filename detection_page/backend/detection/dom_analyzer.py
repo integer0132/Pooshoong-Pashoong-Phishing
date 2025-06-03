@@ -15,7 +15,7 @@ def analyze_dom(url: str) -> Dict:
                     const observer = new MutationObserver((mutations) => {
                         for (const m of mutations) {
                             for (const node of m.addedNodes) {
-                                if (node.tagName && ['FORM', 'IFRAME', 'INPUT'].includes(node.tagName)) {
+                                if (node.tagName && ['FORM', 'INPUT'].includes(node.tagName)) {
                                     let info = { tag: node.tagName, html: node.outerHTML || null };
                                     added.push(info);
                                 }
