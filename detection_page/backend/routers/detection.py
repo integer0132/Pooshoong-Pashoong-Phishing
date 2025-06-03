@@ -4,7 +4,7 @@ import asyncio
 import requests
 import logging
 from urllib.parse import urlparse
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from uuid import uuid4
 from datetime import datetime, timedelta
 
@@ -65,26 +65,26 @@ async def detect(url: str = Form(...)):
 
     js_codes, wasm_files = [], []
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context()
-            page = context.new_page()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
 
             resource_urls = {"js": set(), "wasm": set()}
 
-            def on_request(request):
-                u = request.url
-                if u.endswith(".js"): resource_urls["js"].add(u)
-                elif u.endswith(".wasm"): resource_urls["wasm"].add(u)
-            page.on("request", on_request)
+            page.on("request", lambda request: (
+                resource_urls["js"].add(request.url) if request.url.endswith(".js")
+                else resource_urls["wasm"].add(request.url) if request.url.endswith(".wasm")
+                else None
+            ))
 
             try:
-                page.goto(final_url, timeout=15000)
-                page.wait_for_timeout(5000)
+                await page.goto(final_url, timeout=15000)
+                await page.wait_for_timeout(5000)
             except Exception as e:
                 logger.warning(f"[!] 페이지 로딩 실패: {e}")
 
-            browser.close()
+            await browser.close()
 
         headers = {"User-Agent": "Mozilla/5.0"}
         for js_url in resource_urls["js"]:
