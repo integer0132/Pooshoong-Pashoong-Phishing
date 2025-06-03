@@ -13,7 +13,7 @@ CREDENTIAL_KEYWORDS = [
 URL_PATTERN = r"https?://(?:localhost|\d{1,3}(?:\.\d{1,3}){3}|(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,})(?::\d+)?(?:/[^\s\"\'\)\(\[\]<>{}\\]*)?"
 
 # === 전송 API 호출 패턴
-TRANSMISSION_API_PATTERNS = [
+TRANSMISSION_PATTERNS = [
     r"\bfetch\s*\(\s*['\"]?\s*https?://",
     r"navigator\.sendBeacon\s*\(\s*['\"]?\s*https?://",
     r"\.open\s*\(\s*['\"](?:GET|POST|PUT|DELETE)['\"]\s*,\s*['\"]\s*https?://",
