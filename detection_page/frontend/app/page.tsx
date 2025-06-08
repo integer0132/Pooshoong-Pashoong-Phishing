@@ -213,7 +213,7 @@ export default function URLCheckerPage() {
                     style={{ borderTop: `4px solid ${getBorderColor(item.color)}` }}
                     onClick={() => handleToggle(index)}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between min-h-20">
                       <div>
                         <p className="text-sm text-gray-600">{item.title}</p>
                         <p className="text-2xl font-bold mt-1">{count !== null ? `${count}건` : '-'}</p>
