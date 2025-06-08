@@ -1,29 +1,26 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 export default function URLCheckerPage() {
   const [url, setUrl] = useState('');
-  const [result, setResult] = useState<{
-    status: 'idle' | 'loading' | 'success' | 'error';
-    message?: string;
-    data?: any;
-  }>({ status: 'idle' });
-
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
   const exampleRef = useRef<HTMLDivElement | null>(null);
 
   const getReasonCount = (moduleName: string) => {
-    if (!result.data || !result.data.modules) return null;
-    const mod = result.data.modules.find((m: any) => m.module.includes(moduleName));
-    if (!mod || mod.result === '정상') return 0;
+    if (!result || !result.modules) return null;
+    const mod = result.modules.find((m: any) => m.module.includes(moduleName));
+    if (!mod || mod.result === '정상' || !Array.isArray(mod.reasons)) return 0;
     return mod.reasons.length;
   };
 
   const getModuleReasons = (moduleName: string) => {
-    if (!result.data || !result.data.modules) return [];
-    const mod = result.data.modules.find((m: any) => m.module.includes(moduleName));
-    return mod ? mod.reasons : [];
+    if (!result || !result.modules) return [];
+    const mod = result.modules.find((m: any) => m.module.includes(moduleName));
+    return Array.isArray(mod?.reasons) ? mod.reasons : [];
   };
 
   const dashboardItems = [
@@ -40,44 +37,58 @@ export default function URLCheckerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!url) {
-      setResult({ status: 'error', message: 'URL을 입력해주세요.' });
-      return;
-    }
-
+    if (!url) return alert('URL을 입력해주세요.');
     try {
       new URL(url);
-    } catch (e) {
-      setResult({ status: 'error', message: '유효한 URL 형식이 아닙니다.' });
-      return;
+    } catch {
+      return alert('유효한 URL 형식이 아닙니다.');
     }
 
-    setResult({ status: 'loading' });
+    setResult(null);
+    setLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('url', url);
-      const response = await fetch('http://localhost:8000/api/detect', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.detail || `서버 오류 (status ${response.status})`);
-      }
-
-      const json = await response.json();
-      setResult({ status: 'success', message: json.result.summary.message, data: json.result });
-    } catch (e: any) {
-      setResult({ status: 'error', message: e.message });
-    }
+    const formData = new FormData();
+    formData.append('url', url);
+    const res = await fetch('http://localhost:8000/api/detect', {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json();
+    
+    setTaskId(json.task_id);
   };
+
+  useEffect(() => {
+    if (!taskId) return;
+
+    const interval = setInterval(async () => {
+      const res = await fetch(`http://localhost:8000/api/detect/result/${taskId}`);
+      if (res.status === 404) return;
+      const json = await res.json();
+      setResult(json);
+      if (json.summary) {
+        setLoading(false);
+        clearInterval(interval);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [taskId]);
 
   const scrollToExample = () => {
     if (exampleRef.current) {
       exampleRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const getBorderColor = (color: string) => {
+    switch (color) {
+      case 'blue': return '#3b82f6';
+      case 'green': return '#10b981';
+      case 'yellow': return '#f59e0b';
+      case 'red': return '#ef4444';
+      case 'purple': return '#8b5cf6';
+      default: return '#6b7280';
     }
   };
 
@@ -100,51 +111,32 @@ export default function URLCheckerPage() {
 
       <main className="py-12 px-6">
         <div className="max-w-3xl mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-medium mb-4">URL 검사하기</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="flex">
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="검사할 URL을 입력하세요 (예: https://example.com)"
-                  className="flex-1 px-4 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-md"
-                  disabled={result.status === 'loading'}
-                >
-                  {result.status === 'loading' ? '검사 중...' : '검사하기'}
-                </button>
-              </div>
-            </form>
+            <div className="flex">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="검사할 URL을 입력하세요"
+                className="flex-1 px-4 py-2 border rounded-l-md"
+              />
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-md" disabled={loading}>
+                {loading ? '검사 중...' : '검사하기'}
+              </button>
+            </div>
+          </form>
 
-            {result.status === 'error' && (
-              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md">
-                {result.message}
-              </div>
-            )}
-            {result.status === 'loading' && (
-              <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md">
-                URL을 검사하고 있습니다...
-              </div>
-            )}
-            {result.status === 'success' && result.data && (
-              <div
-                className="mt-4 p-4 rounded-md"
-                style={{ backgroundColor: getBgColor(result.data.summary.overall_result) }}
-              >
-                <h2 className="text-lg font-bold mb-2">
-                  🔎 검사 결과: {result.data.summary.overall_result}
-                </h2>
-                <p className="whitespace-pre-line text-sm">
-                  {result.data.summary.message}
-                </p>
-              </div>
-            )}
-          </div>
+          {loading && (
+            <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md">현재 분석 중입니다...</div>
+          )}
+
+          {result?.summary && (
+            <div className="mt-4 p-4 rounded-md" style={{ backgroundColor: getBgColor(result.summary.overall_result) }}>
+              <h2 className="text-lg font-bold mb-2">🔎 검사 결과: {result.summary.overall_result}</h2>
+              <p className="whitespace-pre-line text-sm">{result.summary.message}</p>
+            </div>
+          )}
         </div>
       </main>
 
@@ -153,7 +145,7 @@ export default function URLCheckerPage() {
           <h2 className="text-xl font-semibold mb-6 text-gray-700">대시보드</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {dashboardItems.map((item, index) => {
-              const reasonCount = getReasonCount(item.module);
+              const count = getReasonCount(item.module);
               const reasons = getModuleReasons(item.module);
               return (
                 <div key={index} className="flex flex-col">
@@ -165,16 +157,15 @@ export default function URLCheckerPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-sm text-gray-600">{item.title}</p>
-                        <p className="text-2xl font-bold mt-1">{reasonCount !== null ? `${reasonCount}건` : '-'}</p>
+                        <p className="text-2xl font-bold mt-1">{count !== null ? `${count}건` : '-'}</p>
                       </div>
                       <div className="text-2xl">{item.icon}</div>
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      클릭하여 {toggledItems[index] ? '숨기기' : '자세히 보기'}
-                    </div>
+                    <div className="mt-2 text-xs text-gray-500">클릭하여 {toggledItems[index] ? '숨기기' : '자세히 보기'}</div>
                   </div>
+
                   {toggledItems[index] && (
-                    <div className="mt-2 bg-white p-4 rounded-lg shadow-md overflow-hidden transition-all">
+                    <div className="mt-2 bg-white p-4 rounded-lg shadow-md overflow-hidden">
                       <p className="text-sm text-gray-600 mb-2">{item.description}</p>
                       <pre className="text-sm whitespace-pre-line text-gray-800">
                         {reasons.length > 0 ? reasons.join('\n') : '의심 활동 없음'}
@@ -186,10 +177,7 @@ export default function URLCheckerPage() {
             })}
           </div>
           <div className="mt-10 text-center">
-            <button
-              onClick={scrollToExample}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-md transition"
-            >
+            <button onClick={scrollToExample} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-md transition">
               예제 연습 페이지로 이동 ↓
             </button>
           </div>
@@ -207,15 +195,4 @@ export default function URLCheckerPage() {
       </section>
     </div>
   );
-}
-
-function getBorderColor(color: string): string {
-  switch (color) {
-    case 'blue': return '#3b82f6';
-    case 'green': return '#10b981';
-    case 'yellow': return '#f59e0b';
-    case 'red': return '#ef4444';
-    case 'purple': return '#8b5cf6';
-    default: return '#6b7280';
-  }
 }
