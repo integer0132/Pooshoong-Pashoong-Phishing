@@ -24,7 +24,10 @@ TRANSMISSION_PATTERNS = [
     r"\.src\s*=\s*['\"]\s*https?://",
     r"\.submit\s*\(",
     r'Call\s*\(\s*["\']fetch["\']',
-    r'Reflect::get\s*\(\s*window\s*,\s*["\']fetch["\']'
+    r'Reflect::get\s*\(\s*window\s*,\s*["\']fetch["\']',
+    r"\bsendTelegramMessage\s*\(",
+    r"\bsendToTelegram\s*\(",
+    r"\bexfiltrate\s*\("
 ]
 
 # === 동적 실행 래퍼 패턴
