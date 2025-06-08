@@ -24,10 +24,10 @@ export default function URLCheckerPage() {
   };
 
   const dashboardItems = [
-    { title: '자바스크립트 분석', module: 'HTML/JS 분석', icon: '📄', color: 'blue', description: '의심스러운 자바스크립트 코드를 정적 분석하여 악성 스크립트를 탐지합니다.' },
+    { title: 'HTML/자바스크립트 분석', module: 'HTML/JS 분석', icon: '📄', color: 'blue', description: '의심스러운 HTML/자바스크립트 코드를 정적 분석하여 악성 스크립트를 탐지합니다.' },
     { title: 'URL 분석', module: 'URL 분석', icon: '🔍', color: 'green', description: '입력된 URL의 구조와 리디렉션 등을 분석하여 위험 여부를 판별합니다.' },
-    { title: '블랙리스트 분석', module: '블랙리스트 분석', icon: '🚫', color: 'red', description: '국내외 보안 기관의 블랙리스트와 대조하여 악성 URL 여부를 확인합니다.' },
-    { title: '동적 실행 분석', module: 'DOM 분석', icon: '⚙️', color: 'purple', description: 'URL에 포함된 리소스를 실제로 실행해 보고 이상 행위를 감지합니다.' },
+    { title: '블랙리스트 분석', module: '블랙리스트 분석', icon: '🚫', color: 'red', description: '국내외 보안 기관(GSB, OpenPhish)의 블랙리스트와 대조하여 악성 URL 여부를 확인합니다.' },
+    { title: '페이지 구조 변조 분석', module: 'DOM 분석', icon: '⚙️', color: 'purple', description: '실제 페이지를 열고 초기 로딩 이후 새로 삽입된 버튼, 입력창 등의 변화를 분석하여 사용자 몰래 조작되는 흔적을 탐지합니다.' },
     { title: 'WASM 분석', module: 'WASM 분석', icon: '🧬', color: 'yellow', description: 'WebAssembly 파일을 분석하여 브라우저에서 실행될 수 있는 위험 요소를 확인합니다.' },
   ];
 
@@ -49,29 +49,63 @@ export default function URLCheckerPage() {
 
     const formData = new FormData();
     formData.append('url', url);
-    const res = await fetch('http://localhost:8000/api/detect', {
-      method: 'POST',
-      body: formData,
-    });
-    const json = await res.json();
-    
-    setTaskId(json.task_id);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/detect', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || '서버 오류 발생');
+      }
+
+      const json = await res.json();
+      setTaskId(json.task_id);
+    } catch (err: any) {
+      setLoading(false);
+      setResult({
+        summary: {
+          overall_result: '에러',
+          message: err.message,
+        },
+        modules: [],
+      });
+    }
   };
 
   useEffect(() => {
     if (!taskId) return;
 
     const interval = setInterval(async () => {
-      const res = await fetch(`http://localhost:8000/api/detect/result/${taskId}`);
-      if (res.status === 404) return;
-      const json = await res.json();
-      setResult(json);
-      if (json.summary) {
+      try {
+        const res = await fetch(`http://localhost:8000/api/detect/result/${taskId}`);
+        if (!res.ok) {
+          const errJson = await res.json();
+          throw new Error(errJson.detail || '결과 로딩 실패');
+        }
+
+        const json = await res.json();
+        setResult(json);
+
+        if (json.summary) {
+          setLoading(false);
+          clearInterval(interval);
+        }
+      } catch (err: any) {
         setLoading(false);
+        setResult({
+          summary: {
+            overall_result: '에러',
+            message: err.message,
+          },
+          modules: [],
+        });
         clearInterval(interval);
       }
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, [taskId]);
 
@@ -97,6 +131,7 @@ export default function URLCheckerPage() {
       case '정상': return '#D1FAE5';
       case '의심': return '#FEF3C7';
       case '악성': return '#FECACA';
+      case '에러': return '#FDE68A';
       default: return '#E5E7EB';
     }
   };
@@ -133,8 +168,8 @@ export default function URLCheckerPage() {
 
           {result?.summary && (
             <div className="mt-4 p-4 rounded-md" style={{ backgroundColor: getBgColor(result.summary.overall_result) }}>
-              <h2 className="text-lg font-bold mb-2">🔎 검사 결과: {result.summary.overall_result}</h2>
-              <p className="whitespace-pre-line text-sm">{result.summary.message}</p>
+              <h1 className="text-lg font-bold mb-2">🔎 검사 결과: {result.summary.overall_result}</h1>
+              <h2 className="whitespace-pre-line text-sm">{result.summary.message}</h2>
             </div>
           )}
         </div>
