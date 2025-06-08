@@ -38,12 +38,14 @@ PHISHING_KEYWORDS = [
 
 SUSPICIOUS_HOSTING_DOMAINS = ["vercel.app", "github.io", "netlify.app", "glitch.me"]
 
+
 def extract_domain(url: str) -> str:
     try:
         extracted = tldextract.extract(url)
         return f"{extracted.domain}.{extracted.suffix}".lower()
     except Exception:
         return url
+
 
 def extract_full_host(url: str) -> str:
     try:
@@ -52,12 +54,14 @@ def extract_full_host(url: str) -> str:
     except Exception:
         return url
 
+
 def is_shortened_url(url: str) -> bool:
     try:
         domain = extract_domain(url)
         return domain in SHORTENED_DOMAINS
     except Exception:
         return False
+
 
 def resolve_short_url(url: str) -> str:
     try:
@@ -68,9 +72,11 @@ def resolve_short_url(url: str) -> str:
     except Exception:
         return url
 
+
 def detect_phishing_keywords(url: str) -> list:
     lowered = url.lower()
     return [kw for kw in PHISHING_KEYWORDS if kw in lowered]
+
 
 def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
     domain = domain.lower()
@@ -87,8 +93,14 @@ def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
         if any(h in full_host for h in SUSPICIOUS_HOSTING_DOMAINS):
             if legit in full_host:
                 return legit
+            # (3) 유사 문자열 탐지
+            seq_ratio = SequenceMatcher(None, full_host, legit).ratio()
+            lev_dist = levenshtein_distance(full_host, legit)
+            jaro_score = jaro_winkler_similarity(full_host, legit)
+            if seq_ratio > 0.75 or lev_dist <= 2 or jaro_score > 0.90:
+                return legit
 
-        # (3) 유사도 기반 판별
+        # (4) 일반 도메인 간 유사도
         seq_ratio = SequenceMatcher(None, domain, legit).ratio()
         lev_dist = levenshtein_distance(domain, legit)
         jaro_score = jaro_winkler_similarity(domain, legit)
@@ -96,6 +108,7 @@ def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
             return legit
 
     return None
+
 
 def check_whois_age(domain: str) -> Union[str, None]:
     try:
@@ -107,6 +120,7 @@ def check_whois_age(domain: str) -> Union[str, None]:
         return "fail"
     return None
 
+
 def check_ssl_certificate(domain: str) -> bool:
     try:
         context = ssl.create_default_context()
@@ -115,6 +129,7 @@ def check_ssl_certificate(domain: str) -> bool:
                 return bool(ssock.getpeercert())
     except:
         return False
+
 
 def analyze_url(url: str) -> dict:
     result = {
