@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 # === 민감 키워드
 CREDENTIAL_KEYWORDS = [
-    "password", "passwd", "pwd", "credential", "login", "username", "user", "token", "auth"
+    "password", "passwd", "pwd", "credential", "login", "username", "user", "token", "auth", "message", "info"
 ]
 
 # === 외부 URL 정규표현식
@@ -61,28 +61,38 @@ def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
 
     # === HTML 분석
     for pattern in TRANSMISSION_PATTERNS:
-        if re.search(pattern, html_code, flags=re.MULTILINE | re.DOTALL):
-            if (url_match := re.search(URL_PATTERN, html_code)):
+        matches = re.finditer(pattern, html_code, flags=re.MULTILINE | re.DOTALL)
+        for match in matches:
+            matched_code = html_code[match.start():match.end() + 200]
+            url_match = re.search(URL_PATTERN, matched_code)
+            if url_match:
                 url = url_match.group(0)
                 domain = extract_domain(url)
                 if is_domain_recent(domain):
-                    reasons.append(f"[HTML] 외부 URL 전송 (신규 도메인) - `{domain}`")
-                    keywords = find_credential_keywords(html_code)
+                    keywords = find_credential_keywords(matched_code)
                     if keywords:
-                        reasons.append(f"[HTML] 민감 키워드 포함 ({', '.join(keywords)})")
+                        reasons.append(f"[HTML] 외부 전송 + 민감 키워드 ({', '.join(keywords)}) → `{domain}`")
+                    else:
+                        reasons.append(f"[HTML] 외부 URL 전송 (신규 도메인) - `{domain}`")
 
+    # === JS 분석
     # === JS 분석
     for js in js_codes:
         for pattern in TRANSMISSION_PATTERNS:
-            if re.search(pattern, js, flags=re.MULTILINE | re.DOTALL):
-                if (url_match := re.search(URL_PATTERN, js)):
+            matches = re.finditer(pattern, js, flags=re.MULTILINE | re.DOTALL)
+            for match in matches:
+                matched_code = js[match.start():match.end() + 200]  # 전후 200자 확보
+
+                url_match = re.search(URL_PATTERN, matched_code)
+                if url_match:
                     url = url_match.group(0)
                     domain = extract_domain(url)
                     if is_domain_recent(domain):
-                        reasons.append(f"[JS] 외부 URL 전송 (신규 도메인) - `{domain}`")
-                        keywords = find_credential_keywords(js)
+                        keywords = find_credential_keywords(matched_code)
                         if keywords:
-                            reasons.append(f"[JS] 민감 키워드 포함 ({', '.join(keywords)})")
+                            reasons.append(f"[JS] 외부 전송 + 민감 키워드 ({', '.join(keywords)}) → `{domain}`")
+                        else:
+                            reasons.append(f"[JS] 외부 URL 전송 (신규 도메인) - `{domain}`")
 
                 # 동적 실행 내에서 전송 API + URL 감지
         for wrapper in EVAL_WRAPPERS:
