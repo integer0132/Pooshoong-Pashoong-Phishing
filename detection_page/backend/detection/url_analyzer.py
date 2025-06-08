@@ -72,6 +72,9 @@ def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
     domain = domain.lower()
     full_host = full_host.lower()
 
+    if domain in [d.lower() for d in LEGIT_DOMAINS]:
+        return None
+
     for legit in LEGIT_DOMAINS:
         legit = legit.lower()
         legit_base = legit.split('.')[0]
@@ -133,11 +136,14 @@ def analyze_url(url: str) -> dict:
     full_host = extract_subdomain_host(resolved_url)
     parsed_scheme = urlparse(resolved_url).scheme
 
-    keywords_found = []
-    if domain not in LEGIT_DOMAINS:
-        keywords_found = detect_phishing_keywords(resolved_url)
-        if keywords_found:
-            result["reason"].append(f"피싱 키워드 포함: {', '.join(keywords_found)}")
+    if domain in [d.lower() for d in LEGIT_DOMAINS]:
+        result["reason"].append("공식 도메인과 일치함")
+        result["result"] = "정상"
+        return result
+
+    keywords_found = detect_phishing_keywords(resolved_url)
+    if keywords_found:
+        result["reason"].append(f"피싱 키워드 포함: {', '.join(keywords_found)}")
 
     similar = detect_similar_domain(domain, full_host)
     if similar:
