@@ -52,7 +52,14 @@ async def detect(url: str = Form(...)):
     if not url.strip():
         raise HTTPException(status_code=400, detail="URL은 필수입니다.")
 
+    task_id = str(uuid4())
+    partial_result = {"modules": []}
+    save_task_result(task_id, partial_result)  # 초기화
+
     url_result = await asyncio.to_thread(url_analyzer.analyze_url, url)
+    partial_result["modules"].append({"module": "URL 분석", **url_result})
+    save_task_result(task_id, partial_result)
+
     final_url = url_result.get("final_url", url)
     page_domain = urlparse(final_url).hostname or ""
 
@@ -101,16 +108,22 @@ async def detect(url: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: 정상적인 URL이 아니거나 접근할 수 없습니다.\n{str(e)}")
 
-    html_js_task = asyncio.to_thread(html_js_analyzer.analyze_html_js, html_code, js_codes) if js_codes else asyncio.to_thread(lambda: {"result": "정상", "reason": ["JS 파일 없음"]})
-    dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, final_url)
-    wasm_task = asyncio.to_thread(wasm_analyzer.analyze_wasm, wasm_files, page_domain) if wasm_files else asyncio.to_thread(lambda: {"result": "정상", "reason": ["WASM 파일 없음"]})
-    blacklist_task = asyncio.to_thread(blacklist_analyzer.analyze_blacklist, final_url)
+    html_js_result = await asyncio.to_thread(html_js_analyzer.analyze_html_js, html_code, js_codes) if js_codes else {"result": "정상", "reason": ["JS 파일 없음"]}
+    partial_result["modules"].append({"module": "HTML/JS 분석", **html_js_result})
+    save_task_result(task_id, partial_result)
 
-    html_js_result, dom_result, wasm_result, blacklist_result = await asyncio.gather(
-        html_js_task, dom_task, wasm_task, blacklist_task
-    )
+    dom_result = await asyncio.to_thread(dom_analyzer.analyze_dom, final_url)
+    partial_result["modules"].append({"module": "DOM 분석", **dom_result})
+    save_task_result(task_id, partial_result)
 
-    task_id = str(uuid4())
+    wasm_result = await asyncio.to_thread(wasm_analyzer.analyze_wasm, wasm_files, page_domain) if wasm_files else {"result": "정상", "reason": ["WASM 파일 없음"]}
+    partial_result["modules"].append({"module": "WASM 분석", **wasm_result})
+    save_task_result(task_id, partial_result)
+
+    blacklist_result = await asyncio.to_thread(blacklist_analyzer.analyze_blacklist, final_url)
+    partial_result["modules"].append({"module": "블랙리스트 분석", **blacklist_result})
+    save_task_result(task_id, partial_result)
+
     final_result = rule_engine.aggregate_results({
         "url": url_result,
         "html_js": html_js_result,
@@ -119,8 +132,13 @@ async def detect(url: str = Form(...)):
         "blacklist": blacklist_result
     })
 
-    save_task_result(task_id, final_result)
-    return JSONResponse(content={"task_id": task_id, "result": final_result})
+    # summary와 modules 모두 저장
+    partial_result = get_task_result(task_id) or {}
+    partial_result["summary"] = final_result["summary"]
+    partial_result["modules"] = final_result["modules"]
+    save_task_result(task_id, partial_result)
+
+    return JSONResponse(content={"task_id": task_id})
 
 # === /detect/result/{task_id} ===
 @router.get("/detect/result/{task_id}")
