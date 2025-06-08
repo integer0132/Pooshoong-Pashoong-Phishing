@@ -243,7 +243,7 @@ export default function URLCheckerPage() {
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">🧪 예제 연습 페이지</h2>
           <p className="text-gray-600 mb-6">
-            이 섹션에서는 다양한 예제를 통해 URL 분석 로직을 실습해볼 수 있습니다.
+            이 섹션에서는 예제를 통해 URL 분석 로직을 실습해볼 수 있습니다.
           </p>
 
           {/* 펼치기 버튼 */}
@@ -331,7 +331,7 @@ export default function URLCheckerPage() {
           </button>
           <div className="max-w-4xl mx-auto">
             {showCredentials && (
-              <h3 className="text-7xl font-bold text-gray-800 mb-4">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
                 {' '}
                 피싱 정보는 아래 슬라이드에서 보여주는 순으로 탈취될 수 있습니다!
               </h3>
@@ -369,7 +369,7 @@ export default function URLCheckerPage() {
             />
           )}
         </div>
-        <div className="max-w-7xl mx-auto text-centeri mt-8">
+        <div className="max-w-7xl mx-auto text-center mt-8">
           <h2 className="text-3xl font-bold mb-4">🔐 직접 피싱 당해보기?</h2>
           <h4>피싱 사이트에 접속해 보세요!</h4>
           <div className="flex w-full h-[500px] border rounded-lg overflow-hidden shadow-md mb-20 text-left">
