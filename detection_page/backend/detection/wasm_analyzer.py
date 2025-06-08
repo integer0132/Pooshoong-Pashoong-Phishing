@@ -8,7 +8,14 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from typing import List
 from collections import defaultdict
+import logging
 
+# === 로깅 설정 ===
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 # === 탐지 키워드: 외부 통신 및 민감 정보 ===
 SUSPICIOUS_KEYWORDS = [
     "password", "login", "credentials", "postMessage",
@@ -93,7 +100,34 @@ def analyze_single_wasm(wasm_bytes: bytes, page_domain: str = None) -> dict:
             # 외부 도메인 여부
             if page_domain:
                 page_ext = tldextract.extract(page_domain)
-                dom심",
+                domain_ext = tldextract.extract(domain)
+                if (page_ext.domain, page_ext.suffix) != (domain_ext.domain, domain_ext.suffix):
+                    tags.append("외부 도메인 (페이지와 다름)")
+            else:
+                tags.append("외부 도메인 (기준 도메인 없음)")
+
+            # IP 주소
+            if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", domain):
+                tags.append("IP주소 도메인")
+            if is_domain_recent(domain):
+                tags.append("최근 생성된 도메인 (WHOIS)")
+                    
+            msg = f"WASM 내 의심 키워드 {', '.join(sorted(keywords))} 인근 외부 전송 URL 감지: {url}"
+            if tags:
+                msg += f" [{', '.join(tags)}]"
+            reasons.append(msg)
+
+        # 난독화 탐지
+        for pattern, desc in SUSPICIOUS_ENCODING_PATTERNS:
+            if re.search(pattern, wat_text):
+                found_suspicious_encoding = True
+                encoding_reason = f"WASM 내 인코딩/난독화 패턴 감지 (패턴: {desc})"
+                break
+
+        # 판단 조건 적용
+        if not reasons and found_suspicious_encoding:
+            return {
+                "result": "의심",
                 "reason": [f"{encoding_reason} 그러나 외부 통신 또는 민감 키워드는 없음"]
             }
 
