@@ -61,7 +61,7 @@ async def detect(url: str = Form(...)):
         resp.raise_for_status()
         html_code = resp.text
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"HTML 로딩 실패: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"HTML 로딩 실패: 정상적인 URL이 아니거나 접근할 수 없습니다.\n{str(e)}")
 
     js_codes, wasm_files = [], []
     try:
@@ -82,7 +82,7 @@ async def detect(url: str = Form(...)):
                 await page.goto(final_url, timeout=15000)
                 await page.wait_for_timeout(5000)
             except Exception as e:
-                logger.warning(f"[!] 페이지 로딩 실패: {e}")
+                logger.warning(f"페이지 로딩 실패: 정상적인 URL이 아니거나 접근할 수 없습니다.\n{e}")
 
             await browser.close()
 
@@ -99,7 +99,7 @@ async def detect(url: str = Form(...)):
             except Exception: pass
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JS/WASM 수집 실패: 정상적인 URL이 아니거나 접근할 수 없습니다.\n{str(e)}")
 
     html_js_task = asyncio.to_thread(html_js_analyzer.analyze_html_js, html_code, js_codes) if js_codes else asyncio.to_thread(lambda: {"result": "정상", "reason": ["JS 파일 없음"]})
     dom_task = asyncio.to_thread(dom_analyzer.analyze_dom, final_url)
