@@ -7,9 +7,23 @@ import CustomSlideshow from '../components/CustomSlideshow';
 import PhishingViewer from '../components/PhishingViewer';
 
 export default function URLCheckerPage() {
+  interface ModuleResult {
+    module: string;
+    result: string;
+    reasons: string[];
+  }
+
+  interface DetectionResult {
+    summary: {
+      overall_result: string;
+      message: string;
+    };
+    modules: ModuleResult[];
+  }
+  
   const [url, setUrl] = useState('');
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DetectionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
   const exampleRef = useRef<HTMLDivElement | null>(null);
@@ -36,14 +50,14 @@ export default function URLCheckerPage() {
 
   const getReasonCount = (moduleName: string) => {
     if (!result || !result.modules) return null;
-    const mod = result.modules.find((m: any) => m.module.includes(moduleName));
+    const mod = result.modules.find((m: ModuleResult) => m.module.includes(moduleName));
     if (!mod || mod.result === '정상' || !Array.isArray(mod.reasons)) return 0;
     return mod.reasons.length;
   };
 
   const getModuleReasons = (moduleName: string) => {
     if (!result || !result.modules) return [];
-    const mod = result.modules.find((m: any) => m.module.includes(moduleName));
+    const mod = result.modules.find((m: ModuleResult) => m.module.includes(moduleName));
     return Array.isArray(mod?.reasons) ? mod.reasons : [];
   };
 
