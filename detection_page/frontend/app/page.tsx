@@ -87,7 +87,7 @@ export default function URLCheckerPage() {
 
       const json = await res.json();
       setTaskId(json.task_id);
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false);
       setResult({
         summary: {
@@ -117,7 +117,7 @@ export default function URLCheckerPage() {
           setLoading(false);
           clearInterval(interval);
         }
-      } catch (err: any) {
+      } catch (err) {
         setLoading(false);
         setResult({
           summary: {
@@ -132,12 +132,6 @@ export default function URLCheckerPage() {
 
     return () => clearInterval(interval);
   }, [taskId]);
-
-  const scrollToExample = () => {
-    if (exampleRef.current) {
-      exampleRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   const getBorderColor = (color: string) => {
     switch (color) {
