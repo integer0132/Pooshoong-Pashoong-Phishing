@@ -26,7 +26,6 @@ export default function URLCheckerPage() {
   const [result, setResult] = useState<DetectionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [toggledItems, setToggledItems] = useState<{ [key: number]: boolean }>({});
-  const exampleRef = useRef<HTMLDivElement | null>(null);
   const [showExample, setShowExample] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState<{ email: string; password: string }[]>([]);
