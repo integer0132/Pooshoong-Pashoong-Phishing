@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import DualImageViewer from '../components/DualImageViewer';
 import EducationViewer from '../components/EducationViewer';
 import CustomSlideshow from '../components/CustomSlideshow';
