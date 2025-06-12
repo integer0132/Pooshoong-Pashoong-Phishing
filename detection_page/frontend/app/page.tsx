@@ -88,7 +88,7 @@ export default function URLCheckerPage() {
     formData.append('url', url);
 
     try {
-      const res = await fetch('http://localhost:8000/api/detect', {
+      const res = await fetch('/api/detect', {
         method: 'POST',
         body: formData,
       });
@@ -118,7 +118,7 @@ export default function URLCheckerPage() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/detect/result/${taskId}`);
+        const res = await fetch(`/api/detect/result/${taskId}`);
         if (!res.ok) {
           const errJson = await res.json();
           throw new Error(errJson.detail || '결과 로딩 실패');
