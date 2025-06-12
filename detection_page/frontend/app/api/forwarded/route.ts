@@ -3,6 +3,11 @@ import {NextRequest, NextResponse} from 'next/server';
 
 const latestStack: {email: string; password: string}[] = [];
 
+setInterval(() => {
+  latestStack.length = 0; // 배열 비우기
+  console.log('[INFO] latestStack 초기화됨');
+}, 1 * 60 * 1000);
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const newEntry = body;
