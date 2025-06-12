@@ -103,10 +103,11 @@ export default function URLCheckerPage() {
       setTaskId(json.task_id);
     } catch (err) {
       setLoading(false);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       setResult({
         summary: {
           overall_result: '에러',
-          message: err.message,
+          message: errorMessage,
         },
         modules: [],
       });
@@ -133,10 +134,11 @@ export default function URLCheckerPage() {
         }
       } catch (err) {
         setLoading(false);
+        const errorMessage = err instanceof Error ? err.message : String(err);
         setResult({
           summary: {
             overall_result: '에러',
-            message: err.message,
+            message: errorMessage,
           },
           modules: [],
         });
