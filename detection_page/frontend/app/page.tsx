@@ -173,14 +173,14 @@ export default function URLCheckerPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b px-8 py-4">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-xl font-bold text-gray-800">URL 검사기</h1>
+          <h1 className="text-xl font-bold text-gray-800">푸슝파슝피싱</h1>
         </div>
       </header>
 
       <main className="py-12 px-6">
         <div className="max-w-3xl mx-auto">
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-lg font-medium mb-4">URL 검사하기</h2>
+            <h2 className="text-lg font-medium mb-4">계정 탈취 URL 검사하기</h2>
             <div className="flex">
               <input
                 type="text"
@@ -273,7 +273,7 @@ export default function URLCheckerPage() {
                   title1="원본 사이트"
                   title2="피싱 사이트"
                   url1="https://accounts.google.com"
-                  url2="가짜 URL - url 입력 요망"
+                  url2="http://http://34.238.17.75/"
                 />
               </div>
               <EducationViewer
@@ -405,7 +405,7 @@ export default function URLCheckerPage() {
 
 감사합니다.  
 인하대학교 컴퓨터공학과 행정실 드림`}
-  url="https://test-Pooshoong-Pashoong-Phishing.com"
+  url="http://34.238.17.75/"
 />
 
 
