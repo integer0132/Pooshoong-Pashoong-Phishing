@@ -33,7 +33,7 @@ export default function URLCheckerPage() {
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        const res = await fetch('https://Pooshoong-Pashoong-Phishing.com/api/forwarded');
+        const res = await fetch('/api/forwarded');
         const data = await res.json();
         if (Array.isArray(data)) setCredentials(data);
       } catch (err) {
