@@ -77,17 +77,19 @@ async def detect(url: str = Form(...)):
             "overall_result": "정상",
             "message": f"'{registered_domain}'은 신뢰된 공식 도메인으로 등록되어 있습니다."
         }
-        return JSONResponse(content={
-            "task_id": str(uuid4()),
+        modules = [
+            {
+                "module": "URL 분석",
+                "result": "정상",
+                "reasons": ["공식 화이트리스트 도메인입니다."]
+            }
+        ]
+        result = {
             "summary": summary,
-            "modules": [
-                {
-                    "module": "URL 분석",
-                    "result": "정상",
-                    "reasons": ["공식 화이트리스트 도메인입니다."]
-                }
-            ]
-        })
+            "modules": modules
+        }
+        save_task_result(task_id, result)
+        return JSONResponse(content={"task_id": task_id})
     
     try:
         resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
