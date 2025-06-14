@@ -9,12 +9,8 @@ from uuid import uuid4
 from datetime import datetime, timedelta
 import tldextract
 import json
-from pathlib import Path
 
-# 화이트리스트 도메인 JSON 경로
-DOMAIN_WHITELIST_PATH = Path(__file__).resolve().parent.parent / "detection/resources/domain.json"
-
-with open(DOMAIN_WHITELIST_PATH, encoding='utf-8') as f:
+with open("detection/resources/domain.json", encoding='utf-8') as f:
     WHITELISTED_DOMAINS = set(json.load(f))
 
 from detection import (
