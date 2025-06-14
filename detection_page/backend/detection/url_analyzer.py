@@ -67,29 +67,25 @@ def detect_phishing_keywords(url: str) -> list:
     lowered = url.lower()
     return [kw for kw in PHISHING_KEYWORDS if kw in lowered]
 
-# === 유사 도메인 탐지 (강화된 버전) ===
+# === 유사 도메인 탐지 (브랜드 포함 + 유사도 비교)
 def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
     domain = domain.lower()
     full_host = full_host.lower()
-
-    if domain in [d.lower() for d in LEGIT_DOMAINS]:
-        return None
-
-    host_tokens = re.split(r"[.\-]", full_host)
+    normalized_host = re.sub(r'[^a-z0-9]', '', full_host)
 
     for legit in LEGIT_DOMAINS:
         legit = legit.lower()
-        legit_base = legit.split('.')[0]
+        legit_base = tldextract.extract(legit).domain
+        normalized_legit = re.sub(r'[^a-z0-9]', '', legit_base)
 
-        # 포함 또는 조합된 경우
-        if legit_base in full_host and not domain.endswith(legit):
+        if len(normalized_legit) < 3:
+            continue
+
+        # 1. 브랜드 포함 여부 (ex. net-flix.com)
+        if normalized_legit in normalized_host and not domain.endswith(legit):
             return legit
 
-        legit_parts = re.findall(r'\w{3,}', legit_base)
-        if all(part in host_tokens for part in legit_parts):
-            return legit
-
-        # 유사도 기반 비교
+        # 2. 문자열 유사도 비교 (보조적)
         seq_ratio = SequenceMatcher(None, full_host, legit).ratio()
         lev_dist = levenshtein_distance(full_host, legit)
         jaro_score = jaro_winkler_similarity(full_host, legit)
@@ -164,6 +160,7 @@ def analyze_url(url: str) -> dict:
     elif not check_ssl_certificate(domain):
         result["reason"].append("SSL 인증서 없음 또는 연결 실패")
 
+    # 최종 판단
     if any(keyword in r for r in result["reason"] for keyword in ["유사", "실패", "없음", "등록일"]):
         result["result"] = "의심"
     else:
