@@ -13,25 +13,22 @@ CREDENTIAL_KEYWORDS = [
 # === 외부 URL 정규표현식
 URL_PATTERN = r"https?://(?:localhost|\d{1,3}(?:\.\d{1,3}){3}|(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,})(?::\d+)?(?:/[^\s\"\'\)\(\[\]<>{}\\]*)?"
 
-# === 전송 API 호출 패턴
-TRANSMISSION_PATTERNS = [
-    r"\bfetch\s*\(\s*['\"]?\s*https?://",
-    r"navigator\.sendBeacon\s*\(\s*['\"]?\s*https?://",
-    r"\.open\s*\(\s*['\"](?:GET|POST|PUT|DELETE)['\"]\s*,\s*['\"]\s*https?://",
-    r"\.send\s*\(\s*['\"].*(password|token|user|login).*['\"]",
-    r"new\s+WebSocket\s*\(\s*['\"]\s*wss?://",
-    r"\baxios\.(get|post|put|delete)\s*\(\s*['\"]\s*https?://",
-    r"\$\.ajax\s*\(\s*\{\s*url\s*:\s*['\"]\s*https?://",
-    r"\.src\s*=\s*['\"]\s*https?://",
+# === 전송 API 호출 함수만 추출 (괄호 열기까지 탐지)
+TRANSMISSION_FUNCTIONS = [
+    r"\bfetch\s*\(",
+    r"navigator\.sendBeacon\s*\(",
+    r"\.open\s*\(",
+    r"\.send\s*\(",
+    r"new\s+WebSocket\s*\(",
+    r"\baxios\.(get|post|put|delete)\s*\(",
+    r"\$\.ajax\s*\(",
     r"\.submit\s*\(",
-    r'Call\s*\(\s*["\']fetch["\']',
-    r'Reflect::get\s*\(\s*window\s*,\s*["\']fetch["\']',
     r"\bsendTelegramMessage\s*\(",
     r"\bsendToTelegram\s*\(",
     r"\bexfiltrate\s*\("
 ]
 
-# === 동적 실행 래퍼 패턴
+# === 동적 실행 래퍼
 EVAL_WRAPPERS = ["eval", "Function", "setTimeout"]
 
 # === 도메인 추출
@@ -41,7 +38,7 @@ def extract_domain(url: str) -> str:
     except:
         return ""
 
-# === 최근 생성 도메인 여부
+# === WHOIS 검사
 def is_domain_recent(domain: str, days_threshold=30) -> bool:
     try:
         w = whois.whois(domain)
@@ -50,68 +47,73 @@ def is_domain_recent(domain: str, days_threshold=30) -> bool:
             created = created[0]
         return created and (datetime.now() - created).days <= days_threshold
     except:
-        return True  # 조회 실패도 위험 처리
+        return True
 
-# === 민감 키워드 포함 여부 및 목록 반환
+# === 민감 키워드 탐지
 def find_credential_keywords(text: str) -> List[str]:
     return [kw for kw in CREDENTIAL_KEYWORDS if re.search(rf"\b{re.escape(kw)}\b", text)]
 
-# === 민감 키워드 + 전송 함수 조합 탐지 (URL 없이도 탐지)
-def find_combined_suspicion(text: str) -> List[str]:
-    found_reasons = []
-    for pattern in TRANSMISSION_PATTERNS:
-        if re.search(pattern, text, flags=re.MULTILINE | re.DOTALL):
-            for kw in CREDENTIAL_KEYWORDS:
-                if re.search(rf"\b{re.escape(kw)}\b", text):
-                    fn_match = re.search(pattern, text)
-                    if fn_match:
-                        func_name = fn_match.group(0).split("(")[0].strip()
-                        found_reasons.append(f"[JS] URL 없이 `{func_name}` + 민감 키워드 `{kw}` 조합 감지")
-    return found_reasons
+# === 함수 괄호 블록 추출
+def extract_function_block(code: str, start_pos: int) -> str:
+    open_parens = 0
+    i = start_pos
+    while i < len(code):
+        if code[i] == '(':
+            open_parens += 1
+        elif code[i] == ')':
+            open_parens -= 1
+            if open_parens == 0:
+                return code[start_pos:i+1]
+        i += 1
+    return code[start_pos:]
 
 # === 메인 분석 함수
 def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
     reasons = []
 
     # === HTML 분석
-    for pattern in TRANSMISSION_PATTERNS:
-        if re.search(pattern, html_code, flags=re.MULTILINE | re.DOTALL):
-            if (url_match := re.search(URL_PATTERN, html_code)):
+    for func_pattern in TRANSMISSION_FUNCTIONS:
+        for match in re.finditer(func_pattern, html_code, flags=re.DOTALL):
+            start = match.start()
+            block = extract_function_block(html_code, start)
+            if (url_match := re.search(URL_PATTERN, block)):
                 url = url_match.group(0)
                 domain = extract_domain(url)
                 if is_domain_recent(domain):
-                    reasons.append(f"[HTML] 외부 URL 전송 (신규 도메인) - `{domain}`")
-                    keywords = find_credential_keywords(html_code)
-                    if keywords:
-                        reasons.append(f"[HTML] 민감 키워드 포함 ({', '.join(keywords)})")
+                    reasons.append(f"[HTML] 외부 전송 API + 외부 도메인: `{url}`")
+            keywords = find_credential_keywords(block)
+            if keywords:
+                reasons.append(f"[HTML] 전송 함수 내 민감 키워드 포함: {', '.join(keywords)}")
 
     # === JS 분석
     for js in js_codes:
-        for pattern in TRANSMISSION_PATTERNS:
-            if re.search(pattern, js, flags=re.MULTILINE | re.DOTALL):
-                if (url_match := re.search(URL_PATTERN, js)):
+        for func_pattern in TRANSMISSION_FUNCTIONS:
+            for match in re.finditer(func_pattern, js, flags=re.DOTALL):
+                start = match.start()
+                block = extract_function_block(js, start)
+                if (url_match := re.search(URL_PATTERN, block)):
                     url = url_match.group(0)
                     domain = extract_domain(url)
                     if is_domain_recent(domain):
-                        reasons.append(f"[JS] 외부 URL 전송 (신규 도메인) - `{domain}`")
-                        keywords = find_credential_keywords(js)
-                        if keywords:
-                            reasons.append(f"[JS] 민감 키워드 포함 ({', '.join(keywords)})")
+                        reasons.append(f"[JS] 외부 전송 API + 외부 도메인: `{url}`")
+                keywords = find_credential_keywords(block)
+                if keywords:
+                    reasons.append(f"[JS] 전송 함수 내 민감 키워드 포함: {', '.join(keywords)}")
 
-        # === 동적 실행 내 전송 + URL
+        # === eval / setTimeout 등 동적 실행 내 감지
         for wrapper in EVAL_WRAPPERS:
             eval_blocks = re.findall(rf"{wrapper}\s*\(\s*['\"](.*?)['\"]", js, flags=re.DOTALL)
             for block in eval_blocks:
-                for pattern in TRANSMISSION_PATTERNS:
-                    if re.search(pattern, block):
+                for func_pattern in TRANSMISSION_FUNCTIONS:
+                    if re.search(func_pattern, block):
                         if (url_match := re.search(URL_PATTERN, block)):
                             url = url_match.group(0)
                             domain = extract_domain(url)
                             if is_domain_recent(domain):
-                                reasons.append(f"[JS] 동적 실행 내 전송 API + URL 감지 → `{url}` (via {wrapper})")
-
-        # === URL 없이 함수명 + 민감 키워드 조합 탐지
-        reasons.extend(find_combined_suspicion(js))
+                                reasons.append(f"[JS] 동적 실행 내 전송 API + 신규 도메인 감지: `{url}` (via {wrapper})")
+                        keywords = find_credential_keywords(block)
+                        if keywords:
+                            reasons.append(f"[JS] 동적 실행 내 민감 키워드 포함 (via {wrapper}): {', '.join(keywords)}")
 
     return {
         "result": "의심" if reasons else "정상",
