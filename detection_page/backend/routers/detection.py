@@ -92,7 +92,7 @@ async def detect(url: str = Form(...)):
         return JSONResponse(content={"task_id": task_id})
     
     try:
-        resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+        resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"}, verify=False)
         resp.raise_for_status()
         html_code = resp.text
     except Exception as e:
@@ -124,12 +124,12 @@ async def detect(url: str = Form(...)):
         headers = {"User-Agent": "Mozilla/5.0"}
         for js_url in resource_urls["js"]:
             try:
-                resp = requests.get(js_url, headers=headers, timeout=5)
+                resp = requests.get(js_url, headers=headers, timeout=5, verify=False)
                 js_codes.append(resp.text)
             except Exception: pass
         for wasm_url in resource_urls["wasm"]:
             try:
-                resp = requests.get(wasm_url, headers=headers, timeout=5)
+                resp = requests.get(wasm_url, headers=headers, timeout=5, verify=False)
                 wasm_files.append(resp.content)
             except Exception: pass
 
