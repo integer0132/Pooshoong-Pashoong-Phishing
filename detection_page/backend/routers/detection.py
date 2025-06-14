@@ -90,9 +90,9 @@ async def detect(url: str = Form(...)):
         }
         save_task_result(task_id, result)
         return JSONResponse(content={"task_id": task_id})
-    
+
     try:
-        resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"}, verify=False)
+        resp = requests.get(final_url, timeout=5, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"}, verify=False)
         resp.raise_for_status()
         html_code = resp.text
     except Exception as e:
@@ -102,7 +102,9 @@ async def detect(url: str = Form(...)):
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context()
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+            )
             page = await context.new_page()
 
             resource_urls = {"js": set(), "wasm": set()}
@@ -114,14 +116,14 @@ async def detect(url: str = Form(...)):
             ))
 
             try:
-                await page.goto(final_url, timeout=15000)
-                await page.wait_for_timeout(5000)
+                await page.goto(final_url, timeout=15000, wait_until="networkidle")
+                await page.wait_for_timeout(1000)
             except Exception as e:
                 logger.warning(f"페이지 로딩 실패: 정상적인 URL이 아니거나 접근할 수 없습니다.\n{e}")
 
             await browser.close()
 
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"}
         for js_url in resource_urls["js"]:
             try:
                 resp = requests.get(js_url, headers=headers, timeout=5, verify=False)
