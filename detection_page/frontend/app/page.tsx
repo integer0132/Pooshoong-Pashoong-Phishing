@@ -302,7 +302,7 @@ export default function URLCheckerPage() {
                   title1="원본 사이트"
                   title2="피싱 사이트"
                   url1="https://accounts.google.com"
-                  url2="http://http://34.238.17.75/"
+                  url2="http://34.238.17.75/"
                 />
               </div>
               <EducationViewer
