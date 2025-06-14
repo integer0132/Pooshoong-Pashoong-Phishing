@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 # === 민감 키워드
 CREDENTIAL_KEYWORDS = [
     "password", "passwd", "pwd", "credential", "login", "id", "pw",
-    "username", "user", "token", "auth", "message", "info"
+    "username", "user", "token", "auth", "message", "info", "url"
 ]
 
 # === 외부 URL 정규표현식
