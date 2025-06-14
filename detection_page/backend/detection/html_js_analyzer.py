@@ -76,14 +76,15 @@ def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
         for match in re.finditer(func_pattern, html_code, flags=re.DOTALL):
             start = match.start()
             block = extract_function_block(html_code, start)
+            matched_func = match.group(0).split("(")[0].strip()
             if (url_match := re.search(URL_PATTERN, block)):
                 url = url_match.group(0)
                 domain = extract_domain(url)
                 if is_domain_recent(domain):
-                    reasons.append(f"[HTML] 외부 전송 API + 외부 도메인: `{url}`")
+                    reasons.append(f"[HTML] 외부 전송 API `{matched_func}` + 외부 도메인: `{url}`")
             keywords = find_credential_keywords(block)
             if keywords:
-                reasons.append(f"[HTML] 전송 함수 내 민감 키워드 포함: {', '.join(keywords)}")
+                reasons.append(f"[HTML] 전송 함수 `{matched_func}` 내 민감 키워드 포함: {', '.join(keywords)}")
 
     # === JS 분석
     for js in js_codes:
@@ -91,14 +92,15 @@ def analyze_html_js(html_code: str, js_codes: List[str]) -> Dict:
             for match in re.finditer(func_pattern, js, flags=re.DOTALL):
                 start = match.start()
                 block = extract_function_block(js, start)
+                matched_func = match.group(0).split("(")[0].strip()
                 if (url_match := re.search(URL_PATTERN, block)):
                     url = url_match.group(0)
                     domain = extract_domain(url)
                     if is_domain_recent(domain):
-                        reasons.append(f"[JS] 외부 전송 API + 외부 도메인: `{url}`")
+                        reasons.append(f"[JS] 외부 전송 API `{matched_func}` + 외부 도메인: `{url}`")
                 keywords = find_credential_keywords(block)
                 if keywords:
-                    reasons.append(f"[JS] 전송 함수 내 민감 키워드 포함: {', '.join(keywords)}")
+                    reasons.append(f"[JS] 전송 함수 `{matched_func}` 내 민감 키워드 포함: {', '.join(keywords)}")
 
         # === eval / setTimeout 등 동적 실행 내 감지
         for wrapper in EVAL_WRAPPERS:
