@@ -32,7 +32,7 @@ SUSPICIOUS_KEYWORDS = [
 # === 난독화 또는 인코딩 패턴 ===
 SUSPICIOUS_ENCODING_PATTERNS = [
     (r"base64[^\\s]{0,10}decode", "base64 디코딩 함수"),
-    (r"atob\(", "base64 디코딩 함수"),
+    (r"atob", "base64 디코딩 함수"),
     (r"fromCharCode", "문자 코드 기반 디코딩"),
     (r"charCodeAt", "문자 코드 기반 인코딩"),
     (r"btoa", "base64 인코딩 함수"),
