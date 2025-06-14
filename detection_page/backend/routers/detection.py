@@ -9,6 +9,7 @@ from uuid import uuid4
 from datetime import datetime, timedelta
 import tldextract
 import json
+from pathlib import Path
 
 # 화이트리스트 도메인 JSON 경로
 DOMAIN_WHITELIST_PATH = Path(__file__).resolve().parent.parent / "detection/resources/domain.json"
