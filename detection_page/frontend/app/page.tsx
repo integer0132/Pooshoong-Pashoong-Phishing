@@ -259,7 +259,7 @@ export default function URLCheckerPage() {
                                 key={i}
                                 className={`${expandedItems[index] ? '' : 'break-keep'} pr-4`}
                               >
-                                {r}
+                                🚨 {r}
                               </li>
                             ))
                           ) : (
