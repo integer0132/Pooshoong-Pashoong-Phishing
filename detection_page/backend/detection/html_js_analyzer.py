@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 # === 민감 키워드
 CREDENTIAL_KEYWORDS = [
-    "password", "passwd", "pwd", "credential", "login",
+    "password", "passwd", "pwd", "credential", "login", "id", "pw",
     "username", "user", "token", "auth", "message", "info"
 ]
 
