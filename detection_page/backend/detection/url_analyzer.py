@@ -156,7 +156,7 @@ def analyze_url(url: str) -> dict:
     elif age_info:
         result["reason"].append(f"최근 생성된 도메인 (등록일: {age_info})")
 
-    if parsed_scheme == "http":
+    if parsed.scheme == "http":
         result["reason"].append("SSL 인증서 없음 (비보안 HTTP 사용)")
     elif not check_ssl_certificate(domain):
         result["reason"].append("SSL 인증서 없음 또는 연결 실패")
