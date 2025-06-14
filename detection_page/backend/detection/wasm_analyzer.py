@@ -26,6 +26,7 @@ SUSPICIOUS_KEYWORDS = [
     "js_sys::Function", "js_sys::Promise",
     "wasm_bindgen::JsValue", "wasm_bindgen::closure",
     "web_sys::window", "web_sys::Document", "web_sys::Navigator", "web_sys::Fetch",
+    "sendToTelegram", "sendTelegramMessage", "exfiltrate"
 ]
 
 # === 난독화 또는 인코딩 패턴 ===
@@ -96,15 +97,6 @@ def analyze_single_wasm(wasm_bytes: bytes, page_domain: str = None) -> dict:
         for url, keywords in url_hits.items():
             domain = clean_url(url)[1]
             tags = []
-
-            # 외부 도메인 여부
-            if page_domain:
-                page_ext = tldextract.extract(page_domain)
-                domain_ext = tldextract.extract(domain)
-                if (page_ext.domain, page_ext.suffix) != (domain_ext.domain, domain_ext.suffix):
-                    tags.append("외부 도메인 (페이지와 다름)")
-            else:
-                tags.append("외부 도메인 (기준 도메인 없음)")
 
             # IP 주소
             if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", domain):
