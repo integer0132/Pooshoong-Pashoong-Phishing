@@ -29,6 +29,7 @@ export default function URLCheckerPage() {
   const [showExample, setShowExample] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState<{ email: string; password: string }[]>([]);
+  const [expandedItems, setExpandedItems] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -46,6 +47,10 @@ export default function URLCheckerPage() {
 
     return () => clearInterval(interval); // 언마운트 시 정리
   }, []);
+
+  const handleExpandToggle = (index: number) => {
+    setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const getReasonCount = (moduleName: string) => {
     if (!result || !result.modules) return null;
@@ -186,7 +191,7 @@ export default function URLCheckerPage() {
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="검사할 URL을 입력하세요 (예: https://example.com)"
+                placeholder="검사할 로그인 페이지 URL을 입력하세요 (예: https://example.com)"
                 className="flex-1 px-4 py-2 border rounded-l-md"
               />
               <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-md" disabled={loading}>
@@ -231,13 +236,37 @@ export default function URLCheckerPage() {
                     </div>
                     <div className="mt-2 text-xs text-gray-500">클릭하여 {toggledItems[index] ? '숨기기' : '자세히 보기'}</div>
                   </div>
-
                   {toggledItems[index] && (
-                    <div className="mt-2 bg-white p-4 rounded-lg shadow-md overflow-hidden">
+                    <div
+                      className={`mt-2 bg-white p-4 rounded-lg shadow-md transition-all duration-300 cursor-pointer ${
+                        expandedItems[index] ? 'w-full max-w-full' : ''
+                      }`}
+                      onClick={() => handleExpandToggle(index)}
+                    >
                       <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                      <pre className="text-sm whitespace-pre-line text-gray-800">
-                        {reasons.length > 0 ? reasons.join('\n') : '의심 활동 없음'}
-                      </pre>
+
+                      <div
+                        className={`text-sm text-gray-800 ${
+                          expandedItems[index]
+                            ? 'whitespace-normal overflow-visible'
+                            : 'overflow-x-auto whitespace-nowrap'
+                        }`}
+                      >
+                        <ul className={`${expandedItems[index] ? 'space-y-2' : 'space-y-1'}`}>
+                          {reasons.length > 0 ? (
+                            reasons.map((r, i) => (
+                              <li
+                                key={i}
+                                className={`${expandedItems[index] ? '' : 'break-keep'} pr-4`}
+                              >
+                                {r}
+                              </li>
+                            ))
+                          ) : (
+                            <li>의심 활동 없음</li>
+                          )}
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>
