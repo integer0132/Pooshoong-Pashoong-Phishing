@@ -8,6 +8,13 @@ from playwright.async_api import async_playwright
 from uuid import uuid4
 from datetime import datetime, timedelta
 import tldextract
+import json
+
+# 화이트리스트 도메인 JSON 경로
+DOMAIN_WHITELIST_PATH = Path(__file__).resolve().parent.parent / "detection/resources/domain.json"
+
+with open(DOMAIN_WHITELIST_PATH, encoding='utf-8') as f:
+    WHITELISTED_DOMAINS = set(json.load(f))
 
 from detection import (
     html_js_analyzer,
