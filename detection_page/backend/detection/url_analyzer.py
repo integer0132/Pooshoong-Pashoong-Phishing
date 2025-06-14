@@ -97,9 +97,9 @@ def detect_similar_domain(domain: str, full_host: str) -> Union[str, None]:
     return None
 
 # === WHOIS 도메인 등록일 확인 ===
-def check_whois_age(host: str) -> Union[str, None]:
+def check_whois_age(domain: str) -> Union[str, None]:
     try:
-        w = whois.whois(host)
+        w = whois.whois(domain)
         creation = w.creation_date[0] if isinstance(w.creation_date, list) else w.creation_date
         if creation and (datetime.now() - creation < timedelta(days=30)):
             return creation.date().isoformat()
@@ -108,11 +108,11 @@ def check_whois_age(host: str) -> Union[str, None]:
     return None
 
 # === SSL 인증서 확인 ===
-def check_ssl_certificate(host: str) -> bool:
+def check_ssl_certificate(domain: str) -> bool:
     try:
         context = ssl.create_default_context()
-        with socket.create_connection((host, 443), timeout=3) as sock:
-            with context.wrap_socket(sock, server_hostname=host) as ssock:
+        with socket.create_connection((domain, 443), timeout=3) as sock:
+            with context.wrap_socket(sock, server_hostname=domain) as ssock:
                 return bool(ssock.getpeercert())
     except:
         return False
@@ -132,9 +132,10 @@ def analyze_url(url: str) -> dict:
     else:
         resolved_url = url
 
-    domain = extract_domain(resolved_url)
-    full_host = extract_subdomain_host(resolved_url)
-    parsed_scheme = urlparse(resolved_url).scheme
+    parsed = urlparse(resolved_url)
+    full_host = parsed.hostname or ""
+    extracted = tldextract.extract(full_host)
+    domain = f"{extracted.domain}.{extracted.suffix}".lower()
 
     if domain in [d.lower() for d in LEGIT_DOMAINS]:
         result["reason"].append("공식 도메인과 일치함")
@@ -149,7 +150,7 @@ def analyze_url(url: str) -> dict:
     if similar:
         result["reason"].append(f"공식 도메인 '{similar}'과 유사하거나 포함된 도메인 사용")
 
-    age_info = check_whois_age(full_host)
+    age_info = check_whois_age(domain)
     if age_info == "fail":
         result["reason"].append("WHOIS 정보 확인 실패")
     elif age_info:
@@ -157,7 +158,7 @@ def analyze_url(url: str) -> dict:
 
     if parsed_scheme == "http":
         result["reason"].append("SSL 인증서 없음 (비보안 HTTP 사용)")
-    elif not check_ssl_certificate(full_host):
+    elif not check_ssl_certificate(domain):
         result["reason"].append("SSL 인증서 없음 또는 연결 실패")
 
     if any(keyword in r for r in result["reason"] for keyword in ["유사", "실패", "없음", "등록일"]):
